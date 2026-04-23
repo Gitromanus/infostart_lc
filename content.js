@@ -65,6 +65,10 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                     <div id="sm-canvas" style="width:100%; height:150px; position:relative;"></div>
                 </div>
 
+                <div id="sm-prediction-box" style="background:#fff; padding:15px; border:1px solid #eee; border-radius:6px; margin-bottom:15px;">
+                    <div style="font-size:11px; color:#999; text-align:center;">Загрузка прогноза...</div>
+                </div>
+
                 <div style="display:flex; align-items:center; gap:10px;">
                     <input type="number" id="sm-pages-input" value="10" style="width:50px; padding:3px;">
                     <button id="sm-load-btn" style="cursor:pointer; padding:6px 12px; background:#007bff; color:#fff; border:none; border-radius:4px;">Догрузить историю</button>
@@ -200,7 +204,102 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                 document.getElementById('sm-val-total').innerText = totalSM.toFixed(2) + ' $m';
                 document.getElementById('sm-val-total-rub').innerText = format(totalSM) + ' ₽';
                 drawChart(data);
+                drawPrediction(data);
             }
+        };
+
+        // 3. AI-ПРОГНОЗ ПРИБЫЛИ
+        const calculateLinearRegression = (points) => {
+            if (points.length < 2) return null;
+            const n = points.length;
+            let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+            
+            points.forEach((p, i) => {
+                sumX += i;
+                sumY += p.y;
+                sumXY += i * p.y;
+                sumXX += i * i;
+            });
+            
+            const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+            const intercept = (sumY - slope * sumX) / n;
+            
+            return { slope, intercept };
+        };
+
+        const drawPrediction = (data) => {
+            const container = document.getElementById('sm-prediction-box');
+            if (!container) return;
+            
+            if (data.length < 5) {
+                container.innerHTML = '<div style="font-size:11px; color:#999; text-align:center;">Недостаточно данных для прогноза</div>';
+                return;
+            }
+
+            // Группируем данные по дням за последние 30 дней
+            const dailyData = {};
+            const now = new Date();
+            for (let i = 29; i >= 0; i--) {
+                const d = new Date(now);
+                d.setDate(d.getDate() - i);
+                const dateStr = d.toLocaleDateString('ru-RU');
+                dailyData[dateStr] = 0;
+            }
+            
+            data.forEach(e => {
+                if (dailyData.hasOwnProperty(e.date)) {
+                    dailyData[e.date] += e.sm * currentRate;
+                }
+            });
+
+            const points = Object.entries(dailyData)
+                .filter(([_, v]) => v > 0)
+                .map(([_, v]) => ({ y: v }));
+
+            if (points.length < 3) {
+                container.innerHTML = '<div style="font-size:11px; color:#999; text-align:center;">Недостаточно активных дней для прогноза</div>';
+                return;
+            }
+
+            const regression = calculateLinearRegression(points);
+            if (!regression) {
+                container.innerHTML = '<div style="font-size:11px; color:#999; text-align:center;">Не удалось построить прогноз</div>';
+                return;
+            }
+
+            const nextDayIndex = points.length;
+            const nextWeekIndex = points.length + 6;
+            const nextMonthIndex = points.length + 29;
+
+            const predictedNextDay = Math.max(0, regression.slope * nextDayIndex + regression.intercept);
+            const predictedNextWeek = Math.max(0, regression.slope * nextWeekIndex + regression.intercept);
+            const predictedNextMonth = Math.max(0, regression.slope * nextMonthIndex + regression.intercept);
+
+            const trend = regression.slope > 0 ? '↗' : regression.slope < 0 ? '↘' : '→';
+            const trendText = regression.slope > 0 ? 'растёт' : regression.slope < 0 ? 'падает' : 'стабилен';
+            const trendColor = regression.slope > 0 ? '#28a745' : regression.slope < 0 ? '#d32f2f' : '#999';
+
+            container.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <div style="font-size:12px; font-weight:bold; color:#666;">🤖 AI-ПРОГНОЗ ${trend}</div>
+                    <div style="font-size:10px; color:${trendColor};">${trendText} (${Math.abs(regression.slope).toFixed(0)} ₽/день)</div>
+                </div>
+                <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:8px;">
+                    <div style="background:#f0f8ff; padding:8px; border-radius:4px; text-align:center;">
+                        <div style="font-size:9px; color:#666;">ЗАВТРА</div>
+                        <div style="font-size:14px; font-weight:bold; color:#1976d2;">${predictedNextDay.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₽</div>
+                    </div>
+                    <div style="background:#f0f8ff; padding:8px; border-radius:4px; text-align:center;">
+                        <div style="font-size:9px; color:#666;">ЧЕРЕЗ НЕДЕЛЮ</div>
+                        <div style="font-size:14px; font-weight:bold; color:#1976d2;">${predictedNextWeek.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₽</div>
+                    </div>
+                    <div style="background:#f0f8ff; padding:8px; border-radius:4px; text-align:center;">
+                        <div style="font-size:9px; color:#666;">ЧЕРЕЗ МЕСЯЦ</div>
+                        <div style="font-size:14px; font-weight:bold; color:#1976d2;">${predictedNextMonth.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₽</div>
+                    </div>
+                </div>
+                <div style="margin-top:6px; font-size:9px; color:#999; text-align:center;">*Прогноз основан на линейном анализе последних 30 дней</div>
+            `;
         };
 
         const autoSync = () => {
