@@ -209,24 +209,6 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
         };
 
         // 3. AI-ПРОГНОЗ ПРИБЫЛИ
-        const calculateLinearRegression = (points) => {
-            if (points.length < 2) return null;
-            const n = points.length;
-            let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
-            
-            points.forEach((p, i) => {
-                sumX += i;
-                sumY += p.y;
-                sumXY += i * p.y;
-                sumXX += i * i;
-            });
-            
-            const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
-            const intercept = (sumY - slope * sumX) / n;
-            
-            return { slope, intercept };
-        };
-
         const drawPrediction = (data) => {
             const container = document.getElementById('sm-prediction-box');
             if (!container) return;
@@ -236,69 +218,121 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                 return;
             }
 
-            // Группируем данные по дням за последние 30 дней
-            const dailyData = {};
             const now = new Date();
-            for (let i = 29; i >= 0; i--) {
-                const d = new Date(now);
-                d.setDate(d.getDate() - i);
-                const dateStr = d.toLocaleDateString('ru-RU');
-                dailyData[dateStr] = 0;
-            }
-            
+            const currentMonth = now.getMonth() + 1;
+            const currentYear = now.getFullYear();
+            const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+            const today = now.getDate();
+            const daysPassed = today;
+            const daysRemaining = daysInMonth - today;
+
+            // Группируем данные по месяцам для анализа истории
+            const monthlyData = {};
             data.forEach(e => {
-                if (dailyData.hasOwnProperty(e.date)) {
-                    dailyData[e.date] += e.sm * currentRate;
+                const [d, m, y] = e.date.split('.');
+                const key = `${m}.${y}`;
+                if (!monthlyData[key]) monthlyData[key] = 0;
+                monthlyData[key] += e.sm * currentRate;
+            });
+
+            // Считаем доход за текущий месяц
+            let currentMonthTotal = 0;
+            const currentMonthKey = `${currentMonth}.${currentYear}`;
+            data.forEach(e => {
+                const [d, m, y] = e.date.split('.');
+                if (parseInt(m) === currentMonth && parseInt(y) === currentYear) {
+                    currentMonthTotal += e.sm * currentRate;
                 }
             });
 
-            const points = Object.entries(dailyData)
-                .filter(([_, v]) => v > 0)
-                .map(([_, v]) => ({ y: v }));
+            // Считаем средний дневной доход в текущем месяце
+            const dailyAvgCurrent = daysPassed > 0 ? currentMonthTotal / daysPassed : 0;
 
-            if (points.length < 3) {
-                container.innerHTML = '<div style="font-size:11px; color:#999; text-align:center;">Недостаточно активных дней для прогноза</div>';
-                return;
+            // Анализируем аналогичные месяцы (те же номера месяцев в прошлые годы)
+            const similarMonths = [];
+            Object.entries(monthlyData).forEach(([key, value]) => {
+                const [m, y] = key.split('.').map(Number);
+                if (m === currentMonth && (y !== currentYear || daysPassed >= daysInMonth)) {
+                    // Если это тот же месяц но прошлого года, учитываем только если прошло достаточно дней
+                    const monthDays = new Date(y, m, 0).getDate();
+                    const avgDaily = value / monthDays;
+                    similarMonths.push({ year: y, total: value, avgDaily });
+                }
+            });
+
+            // Рассчитываем прогноз несколькими методами и берём средневзвешенное значение
+            
+            // Метод 1: Экстраполяция текущего месяца
+            const method1_currentTrend = currentMonthTotal + (dailyAvgCurrent * daysRemaining);
+            
+            // Метод 2: На основе средней динамики похожих месяцев
+            let method2_historicalAvg = null;
+            if (similarMonths.length > 0) {
+                const avgHistoricalDaily = similarMonths.reduce((sum, m) => sum + m.avgDaily, 0) / similarMonths.length;
+                method2_historicalAvg = currentMonthTotal + (avgHistoricalDaily * daysRemaining);
+            }
+            
+            // Метод 3: Простое масштабирование (пропорция дней)
+            const method3_proportional = daysPassed > 0 ? (currentMonthTotal / daysPassed) * daysInMonth : 0;
+
+            // Выбираем метод или комбинируем
+            let predictedEndOfMonth;
+            let predictionMethod;
+            let confidence = 'средняя';
+            let confidenceColor = '#ff9800';
+
+            if (similarMonths.length >= 2 && method2_historicalAvg !== null) {
+                // Если есть история похожих месяцев, используем взвешенное среднее
+                const weightCurrent = 0.4;
+                const weightHistorical = 0.6;
+                predictedEndOfMonth = (method1_currentTrend * weightCurrent) + (method2_historicalAvg * weightHistorical);
+                predictionMethod = 'на основе текущего месяца и истории';
+                confidence = 'высокая';
+                confidenceColor = '#28a745';
+            } else if (daysPassed >= 5) {
+                // Если прошло достаточно дней в месяце, используем тренд текущего месяца
+                predictedEndOfMonth = method1_currentTrend;
+                predictionMethod = 'на основе динамики текущего месяца';
+            } else {
+                // Мало данных - используем пропорциональный метод
+                predictedEndOfMonth = method3_proportional;
+                predictionMethod = 'предварительный (мало данных)';
+                confidence = 'низкая';
+                confidenceColor = '#f44336';
             }
 
-            const regression = calculateLinearRegression(points);
-            if (!regression) {
-                container.innerHTML = '<div style="font-size:11px; color:#999; text-align:center;">Не удалось построить прогноз</div>';
-                return;
-            }
+            predictedEndOfMonth = Math.max(0, predictedEndOfMonth);
 
-            const nextDayIndex = points.length;
-            const nextWeekIndex = points.length + 6;
-            const nextMonthIndex = points.length + 29;
+            // Определяем тренд
+            const trendIcon = predictedEndOfMonth > currentMonthTotal ? '↗' : predictedEndOfMonth < currentMonthTotal ? '↘' : '→';
+            const trendText = predictedEndOfMonth > currentMonthTotal ? 'рост' : predictedEndOfMonth < currentMonthTotal ? 'снижение' : 'стабильно';
+            const trendColor = predictedEndOfMonth > currentMonthTotal ? '#28a745' : predictedEndOfMonth < currentMonthTotal ? '#d32f2f' : '#999';
 
-            const predictedNextDay = Math.max(0, regression.slope * nextDayIndex + regression.intercept);
-            const predictedNextWeek = Math.max(0, regression.slope * nextWeekIndex + regression.intercept);
-            const predictedNextMonth = Math.max(0, regression.slope * nextMonthIndex + regression.intercept);
-
-            const trend = regression.slope > 0 ? '↗' : regression.slope < 0 ? '↘' : '→';
-            const trendText = regression.slope > 0 ? 'растёт' : regression.slope < 0 ? 'падает' : 'стабилен';
-            const trendColor = regression.slope > 0 ? '#28a745' : regression.slope < 0 ? '#d32f2f' : '#999';
+            // Прогнозируемый дополнительный доход до конца месяца
+            const additionalIncome = Math.max(0, predictedEndOfMonth - currentMonthTotal);
 
             container.innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                    <div style="font-size:12px; font-weight:bold; color:#666;">🤖 AI-ПРОГНОЗ ${trend}</div>
-                    <div style="font-size:10px; color:${trendColor};">${trendText} (${Math.abs(regression.slope).toFixed(0)} ₽/день)</div>
+                    <div style="font-size:12px; font-weight:bold; color:#666;">🤖 ПРОГНОЗ ДО КОНЦА МЕСЯЦА ${trendIcon}</div>
+                    <div style="font-size:9px; color:${confidenceColor};">Достоверность: ${confidence}</div>
                 </div>
-                <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:8px;">
-                    <div style="background:#f0f8ff; padding:8px; border-radius:4px; text-align:center;">
-                        <div style="font-size:9px; color:#666;">ЗАВТРА</div>
-                        <div style="font-size:14px; font-weight:bold; color:#1976d2;">${predictedNextDay.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₽</div>
+                <div style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding:12px; border-radius:6px; text-align:center; margin-bottom:8px;">
+                    <div style="font-size:10px; color:rgba(255,255,255,0.9);">Ожидаемый итог за ${currentMonth}.${currentYear}</div>
+                    <div style="font-size:20px; font-weight:bold; color:#fff; margin-top:4px;">${predictedEndOfMonth.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₽</div>
+                </div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+                    <div style="background:#f8f9fa; padding:8px; border-radius:4px; text-align:center;">
+                        <div style="font-size:9px; color:#666;">УЖЕ ЗАРАБОТАНО</div>
+                        <div style="font-size:13px; font-weight:bold; color:#28a745;">${currentMonthTotal.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₽</div>
                     </div>
-                    <div style="background:#f0f8ff; padding:8px; border-radius:4px; text-align:center;">
-                        <div style="font-size:9px; color:#666;">ЧЕРЕЗ НЕДЕЛЮ</div>
-                        <div style="font-size:14px; font-weight:bold; color:#1976d2;">${predictedNextWeek.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₽</div>
-                    </div>
-                    <div style="background:#f0f8ff; padding:8px; border-radius:4px; text-align:center;">
-                        <div style="font-size:9px; color:#666;">ЧЕРЕЗ МЕСЯЦ</div>
-                        <div style="font-size:14px; font-weight:bold; color:#1976d2;">${predictedNextMonth.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₽</div>
+                    <div style="background:#f8f9fa; padding:8px; border-radius:4px; text-align:center;">
+                        <div style="font-size:9px; color:#666;">ОЖИДАЕТСЯ (${daysRemaining} дн.)</div>
+                        <div style="font-size:13px; font-weight:bold; color:#1976d2;">+${additionalIncome.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₽</div>
                     </div>
                 </div>
-                <div style="margin-top:6px; font-size:9px; color:#999; text-align:center;">*Прогноз основан на линейном анализе последних 30 дней</div>
+                <div style="margin-top:6px; font-size:9px; color:#999; text-align:center;">
+                    *Прогноз ${predictionMethod}${similarMonths.length > 0 ? ` (учтено ${similarMonths.length} похожих мес.)` : ''}
+                </div>
             `;
         };
 
