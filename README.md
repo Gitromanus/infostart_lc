@@ -8,7 +8,7 @@
 
 ## Демонстрация
 
-![Дашборд статистики транзакций]([https://downloader.disk.yandex.ru/preview/cbde4526a68cc14b76adba06e43a9239cf2fb633662107b02fb6f16c7a765db2/69ec08ab/Gpm7vvJa_Mg6vZtTDUS3bKZLHWpXIcLMVb7TNAJhw8L2w-TOVDpsKITwT0CFOYHl6DD6HDIcvavVGxbNfdir4A%3D%3D?uid=0&filename=%D0%A1%D0%BD%D0%B8%D0%BC%D0%BE%D0%BA%20%D1%8D%D0%BA%D1%80%D0%B0%D0%BD%D0%B0%202026-04-25%20011110.png&disposition=inline&hash=&limit=0&content_type=image%2Fpng&owner_uid=0&tknv=v3&size=2048x2048))
+![Дашборд статистики транзакций](https://github.com/Gitromanus/infostart_lc/blob/main/dash.png?raw=true)
 
 *На скриншоте показан дашборд со статистикой транзакций за сегодня, месяц и общий итог с конвертацией в рубли.*
 
