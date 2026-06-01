@@ -69,7 +69,10 @@
 
 ## Страница на Инфостарте
 
-[![Статья на Инфостарте](https://github.com/Gitromanus/infostart_lc/blob/main/logois.svg)](https://infostart.ru/1c/tools/2704357/)
+<a href="https://infostart.ru/1c/tools/2704357/" target="_blank">
+  <img src="./logois.svg" height="22" style="vertical-align: middle; margin-right: 5px;" alt="Инфостарт"><br><strong>Публикация на Инфостарте</strong>
+</a>
+
 
 ## Поддержка
 
