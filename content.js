@@ -1,27 +1,79 @@
 chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
-    let currentRate = result.sm_rate || 167.06;
+    let currentRate = result.sm_rate || 170;
     let cachedStats = result.sm_all_stats || [];
     let currentView = 'month'; 
     
     const isTransact = window.location.href.includes('transact');
-    const isStock = window.location.href.includes('stockexchange');
 
     // 1. ОБНОВЛЕНИЕ КУРСА С БИРЖИ
-    if (isStock) {
-        const updateRate = () => {
-            const match = document.body.innerText.match(/Текущий:\s*([\d\s,.]+)\s*руб/i);
-            if (match && match[1]) {
-                const newRate = parseFloat(match[1].replace(/\s/g, '').replace(',', '.'));
-                if (!isNaN(newRate) && newRate !== currentRate) {
+    // Фоновый fetch курса — срабатывает при каждом открытии любой страницы расширения
+    const fetchRateInBackground = () => {
+        const stockUrl = 'https://infostart.ru/profile/money/stockexchange/';
+        fetch(stockUrl, { credentials: 'include' })
+            .then(resp => {
+                console.log('SM fetch статус:', resp.status, resp.url);
+                return resp.arrayBuffer();
+            })
+            .then(buf => {
+                const html = new TextDecoder('windows-1251').decode(buf);
+                // Курс в <span class="exh-buy-row">157</span> после текста "Текущий:"
+                // Ищем курс regex прямо в HTML: <span class="exh-buy-row">157</span>
+                const rateMatch = html.match(/<span class=["']exh-sale-row["']>\s*([\d,.]+)\s*<\/span>/);
+                console.log('SM курс найден:', rateMatch ? rateMatch[1] : null);
+                const newRate = rateMatch ? parseFloat(rateMatch[1].replace(',', '.')) : NaN;
+                if (!isNaN(newRate) && newRate > 0 && newRate < 100000) {
                     chrome.storage.local.set({ 'sm_rate': newRate });
                     currentRate = newRate;
-                    console.log('Курс SM обновлен:', currentRate);
+                    console.log('Курс SM обновлен (фон):', currentRate);
+                    // Обновляем дашборд через storage — так renderInfo подхватит новый курс
+                    chrome.storage.local.get(['sm_all_stats'], function(r) {
+                        const stats = r.sm_all_stats || cachedStats;
+                        const valDay = document.getElementById('sm-val-day');
+                        if (valDay) {
+                            const rateLabel = document.querySelector('#sm-dashboard [style*="color:#888"]');
+                            if (rateLabel) rateLabel.innerText = `ЗА СЕГОДНЯ (Курс: ${newRate})`;
+                            const fmt = v => (v * newRate).toLocaleString('ru-RU', {minimumFractionDigits:2, maximumFractionDigits:2});
+                            const todayStr = new Date().toLocaleDateString('ru-RU');
+                            const monthStr = todayStr.substring(3);
+                            const daySM = stats.filter(e => e.date === todayStr).reduce((a,b) => a+b.sm, 0);
+                            const monthSM = stats.filter(e => e.date.endsWith(monthStr)).reduce((a,b) => a+b.sm, 0);
+                            const totalSM = stats.reduce((a,b) => a+b.sm, 0);
+                            document.getElementById('sm-val-day').innerText = daySM.toFixed(2) + ' $m';
+                            document.getElementById('sm-val-day-rub').innerText = fmt(daySM) + ' ₽';
+                            document.getElementById('sm-val-month').innerText = monthSM.toFixed(2) + ' $m';
+                            document.getElementById('sm-val-month-rub').innerText = fmt(monthSM) + ' ₽';
+                            document.getElementById('sm-val-total').innerText = totalSM.toFixed(2) + ' $m';
+                            document.getElementById('sm-val-total-rub').innerText = fmt(totalSM) + ' ₽';
+                            // Перерисовываем суммы в таблице с новым курсом
+                            document.querySelectorAll('.sm-done').forEach(el => el.remove());
+                            document.querySelectorAll('tr').forEach(row => {
+                                const cells = row.querySelectorAll('td');
+                                [1, 2].forEach(idx => {
+                                    const cell = cells[idx];
+                                    if (!cell) return;
+                                    const cellText = cell.innerText.trim();
+                                    if (/^[\d.,]+\$m/.test(cellText)) {
+                                        const val = parseFloat(cellText.split('$')[0].replace(',', '.').replace(/[^\d.]/g, ''));
+                                        if (!isNaN(val)) {
+                                            const d = document.createElement('div');
+                                            d.className = 'sm-done';
+                                            d.style.cssText = 'color:#d32f2f; font-weight:bold; font-size:0.85em; margin-top:2px;';
+                                            d.innerText = `(${(val * newRate).toLocaleString('ru-RU', {minimumFractionDigits:2, maximumFractionDigits:2})} ₽)`;
+                                            cell.appendChild(d);
+                                        }
+                                    }
+                                });
+                            });
+                        }
+                    });
                 }
-            }
-        };
-        updateRate();
-        setInterval(updateRate, 3000);
-    }
+            })
+            .catch(e => console.log('Ошибка получения курса:', e));
+    };
+
+    if (isTransact) {
+        // Только на странице транзакций — забираем курс с биржи в фоне
+        fetchRateInBackground();
 
     // 2. ДАШБОРД И ТРАНЗАКЦИИ
     if (isTransact) {
@@ -157,17 +209,25 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
         };
 
         const updateTable = () => {
-            document.querySelectorAll('td').forEach(cell => {
-                if (cell.innerText.includes('$m') && !cell.innerText.includes('-') && !cell.querySelector('.sm-done')) {
-                    const val = parseFloat(cell.innerText.split('$')[0].replace(',', '.').replace(/[^\d.]/g, ''));
-                    if (!isNaN(val)) {
-                        const d = document.createElement('div');
-                        d.className = 'sm-done';
-                        d.style.cssText = 'color:#d32f2f; font-weight:bold; font-size:0.85em; margin-top:2px;';
-                        d.innerText = `(${(val * currentRate).toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2})} ₽)`;
-                        cell.appendChild(d);
+            document.querySelectorAll('tr').forEach(row => {
+                const cells = row.querySelectorAll('td');
+                // Обрабатываем только 2-ю и 3-ю колонки (приход/расход $m), не баланс
+                [1, 2].forEach(idx => {
+                    const cell = cells[idx];
+                    if (!cell) return;
+                    const cellText = cell.innerText.trim();
+                    // Только если ячейка содержит сумму вида '1.00$m [SM]', не описание
+                    if (/^[\d.,]+\$m/.test(cellText) && !cell.querySelector('.sm-done')) {
+                        const val = parseFloat(cellText.split('$')[0].replace(',', '.').replace(/[^\d.]/g, ''));
+                        if (!isNaN(val)) {
+                            const d = document.createElement('div');
+                            d.className = 'sm-done';
+                            d.style.cssText = 'color:#d32f2f; font-weight:bold; font-size:0.85em; margin-top:2px;';
+                            d.innerText = `(${(val * currentRate).toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2})} ₽)`;
+                            cell.appendChild(d);
+                        }
                     }
-                }
+                });
             });
         };
 
@@ -197,6 +257,9 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
             const totalSM = data.reduce((a, b) => a + b.sm, 0);
 
             if (document.getElementById('sm-val-day')) {
+                // Обновляем лейбл с актуальным курсом
+                const rateLabel = document.querySelector('#sm-dashboard [style*="color:#888"]');
+                if (rateLabel) rateLabel.innerText = `ЗА СЕГОДНЯ (Курс: ${currentRate})`;
                 document.getElementById('sm-val-day').innerText = daySM.toFixed(2) + ' $m';
                 document.getElementById('sm-val-day-rub').innerText = format(daySM) + ' ₽';
                 document.getElementById('sm-val-month').innerText = monthSM.toFixed(2) + ' $m';
@@ -388,4 +451,5 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
             updateTable();
         }, 3000);
     }
+}
 });
