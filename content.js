@@ -1,9 +1,22 @@
-chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
+chrome.storage.local.get(['sm_rate', 'sm_all_stats', 'sm_dark_theme'], function(result) {
     let currentRate = result.sm_rate || 170;
     let cachedStats = result.sm_all_stats || [];
-    let currentView = 'month'; 
-    
+    let currentView = 'month';
+    // Тёмная тема по умолчанию ВКЛ (если ещё не задано явно)
+    let darkTheme = result.sm_dark_theme !== false;
+
     const isTransact = window.location.href.includes('transact');
+
+    // 0. ПРИМЕНЕНИЕ ТЁМНОЙ ТЕМЫ
+    // Класс на <html> — тему.css переопределяет стили инфостарта, когда класс есть
+    const applyTheme = (enabled) => {
+        if (enabled) {
+            document.documentElement.classList.add('sm-dark-theme');
+        } else {
+            document.documentElement.classList.remove('sm-dark-theme');
+        }
+    };
+    applyTheme(darkTheme);
 
     // 1. ОБНОВЛЕНИЕ КУРСА С БИРЖИ
     // Фоновый fetch курса — срабатывает при каждом открытии любой страницы расширения
@@ -86,7 +99,15 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
             dash.id = 'sm-dashboard';
             dash.style.cssText = "background:#f8f9fa; border:1px solid #ddd; border-radius:8px; padding:15px; margin-bottom:20px; font-family:sans-serif; color:#333;";
             
+            // Текст кнопки отражает, КУДА переключит (actionable convention)
+            const themeBtnLabel = darkTheme ? '☀️ Светлая' : '🌙 Тёмная';
+            const themeBtnTitle = darkTheme ? 'Переключить на светлую тему' : 'Переключить на тёмную тему';
+
             dash.innerHTML = `
+                <div id="sm-dashboard-header">
+                    <div class="sm-title">📊 SM ДАШБОРД</div>
+                    <button id="sm-theme-toggle" title="${themeBtnTitle}">${themeBtnLabel}</button>
+                </div>
                 <div style="display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 15px;">
                     <div style="flex: 1; min-width: 140px; background:#fff; padding:10px; border-radius:6px; border:1px solid #eee;">
                         <div style="font-size:11px; color:#888;">ЗА СЕГОДНЯ (Курс: ${currentRate})</div>
@@ -138,6 +159,18 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                 };
             });
             document.getElementById('sm-load-btn').onclick = collectHistory;
+
+            // Переключатель тёмной темы
+            const themeBtn = document.getElementById('sm-theme-toggle');
+            if (themeBtn) {
+                themeBtn.onclick = () => {
+                    darkTheme = !darkTheme;
+                    applyTheme(darkTheme);
+                    chrome.storage.local.set({ 'sm_dark_theme': darkTheme });
+                    themeBtn.innerText = darkTheme ? '☀️ Светлая' : '🌙 Тёмная';
+                    themeBtn.title = darkTheme ? 'Переключить на светлую тему' : 'Переключить на тёмную тему';
+                };
+            }
         };
 
         const drawChart = (data) => {

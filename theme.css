@@ -1,0 +1,311 @@
+/* =====================================================================
+   SM Dashboard — Dark theme for infostart.ru
+   All rules are scoped under `html.sm-dark-theme` so toggling is instant
+   and side-effect free. Override colors mimic the GitHub dark palette.
+   ===================================================================== */
+
+html.sm-dark-theme,
+html.sm-dark-theme body {
+    background-color: #0d1117 !important;
+    color: #e6edf3 !important;
+}
+
+html.sm-dark-theme a,
+html.sm-dark-theme a:link,
+html.sm-dark-theme a:visited {
+    color: #58a6ff !important;
+}
+html.sm-dark-theme a:hover { color: #79c0ff !important; }
+
+html.sm-dark-theme h1, html.sm-dark-theme h2, html.sm-dark-theme h3,
+html.sm-dark-theme h4, html.sm-dark-theme h5, html.sm-dark-theme h6 {
+    color: #e6edf3 !important;
+}
+
+html.sm-dark-theme small,
+html.sm-dark-theme .muted,
+html.sm-dark-theme .text-muted {
+    color: #8b949e !important;
+}
+
+/* --- Header / nav / footer ----------------------------------------- */
+html.sm-dark-theme header,
+html.sm-dark-theme .header,
+html.sm-dark-theme .top-bar,
+html.sm-dark-theme .navbar,
+html.sm-dark-theme nav,
+html.sm-dark-theme .nav,
+html.sm-dark-theme .menu,
+html.sm-dark-theme footer,
+html.sm-dark-theme .footer {
+    background-color: #161b22 !important;
+    color: #e6edf3 !important;
+    border-color: #30363d !important;
+}
+
+/* --- Main content wrappers ----------------------------------------- */
+html.sm-dark-theme .container,
+html.sm-dark-theme .wrapper,
+html.sm-dark-theme main,
+html.sm-dark-theme .main,
+html.sm-dark-theme .content,
+html.sm-dark-theme .page-content {
+    background-color: #0d1117 !important;
+    color: #e6edf3 !important;
+}
+
+/* --- Cards / panels / white-blocks --------------------------------- */
+html.sm-dark-theme [class*="card"],
+html.sm-dark-theme [class*="panel"],
+html.sm-dark-theme [class*="block"],
+html.sm-dark-theme [class*="widget"],
+html.sm-dark-theme .white-block,
+html.sm-dark-theme .bx-white-block,
+html.sm-dark-theme .task-card,
+html.sm-dark-theme .item,
+html.sm-dark-theme .task,
+html.sm-dark-theme .order,
+html.sm-dark-theme .sidebar,
+html.sm-dark-theme aside {
+    background-color: #161b22 !important;
+    color: #e6edf3 !important;
+    border-color: #30363d !important;
+}
+
+/* --- Tables -------------------------------------------------------- */
+html.sm-dark-theme table {
+    background-color: #161b22 !important;
+    color: #e6edf3 !important;
+    border-color: #30363d !important;
+}
+
+html.sm-dark-theme th,
+html.sm-dark-theme thead td,
+html.sm-dark-theme thead th {
+    background-color: #21262d !important;
+    color: #e6edf3 !important;
+    border-color: #30363d !important;
+}
+
+html.sm-dark-theme td,
+html.sm-dark-theme tbody tr,
+html.sm-dark-theme tfoot tr {
+    background-color: transparent !important;
+    color: #e6edf3 !important;
+    border-color: #30363d !important;
+}
+
+html.sm-dark-theme tr:nth-child(even) td,
+html.sm-dark-theme tr:nth-child(even) {
+    background-color: #1c2128 !important;
+}
+
+html.sm-dark-theme tr:hover td {
+    background-color: #21262d !important;
+}
+
+/* --- Forms --------------------------------------------------------- */
+html.sm-dark-theme input,
+html.sm-dark-theme select,
+html.sm-dark-theme textarea {
+    background-color: #0d1117 !important;
+    color: #e6edf3 !important;
+    border: 1px solid #30363d !important;
+}
+
+html.sm-dark-theme input::placeholder,
+html.sm-dark-theme textarea::placeholder {
+    color: #6e7681 !important;
+    opacity: 1;
+}
+
+html.sm-dark-theme input:focus,
+html.sm-dark-theme select:focus,
+html.sm-dark-theme textarea:focus {
+    border-color: #58a6ff !important;
+    outline: none !important;
+    box-shadow: 0 0 0 1px #58a6ff !important;
+}
+
+html.sm-dark-theme label {
+    color: #e6edf3 !important;
+}
+
+/* --- Buttons ------------------------------------------------------- */
+html.sm-dark-theme button,
+html.sm-dark-theme .btn,
+html.sm-dark-theme [class*="button"] {
+    background-color: #21262d !important;
+    color: #e6edf3 !important;
+    border: 1px solid #30363d !important;
+}
+
+html.sm-dark-theme button:hover,
+html.sm-dark-theme .btn:hover {
+    background-color: #30363d !important;
+    border-color: #484f58 !important;
+}
+
+html.sm-dark-theme .btn-primary,
+html.sm-dark-theme [class*="btn-primary"],
+html.sm-dark-theme .btn-success,
+html.sm-dark-theme [class*="btn-success"],
+html.sm-dark-theme .btn-green,
+html.sm-dark-theme [class*="btn-green"] {
+    background-color: #1976d2 !important;
+    color: #fff !important;
+    border-color: #1976d2 !important;
+}
+
+html.sm-dark-theme .btn-primary:hover,
+html.sm-dark-theme [class*="btn-primary"]:hover {
+    background-color: #1565c0 !important;
+    border-color: #1565c0 !important;
+}
+
+/* --- Inline-style overrides (catches pages that hardcode bg colors) */
+html.sm-dark-theme [style*="background:#fff"],
+html.sm-dark-theme [style*="background: #fff"],
+html.sm-dark-theme [style*="background:#FFF"],
+html.sm-dark-theme [style*="background: #FFF"],
+html.sm-dark-theme [style*="background:white"],
+html.sm-dark-theme [style*="background: white"] {
+    background: #161b22 !important;
+    color: #e6edf3 !important;
+}
+
+html.sm-dark-theme [style*="background:#f8f9fa"],
+html.sm-dark-theme [style*="background: #f8f9fa"],
+html.sm-dark-theme [style*="background:#f5f5f5"],
+html.sm-dark-theme [style*="background: #f5f5f5"] {
+    background: #161b22 !important;
+    color: #e6edf3 !important;
+}
+
+html.sm-dark-theme [style*="background:#fafafa"],
+html.sm-dark-theme [style*="background: #fafafa"] {
+    background: #0d1117 !important;
+}
+
+html.sm-dark-theme [style*="color:#333"],
+html.sm-dark-theme [style*="color: #333"],
+html.sm-dark-theme [style*="color:#000"],
+html.sm-dark-theme [style*="color: #000"] {
+    color: #e6edf3 !important;
+}
+
+html.sm-dark-theme [style*="color:#888"],
+html.sm-dark-theme [style*="color: #888"],
+html.sm-dark-theme [style*="color:#666"],
+html.sm-dark-theme [style*="color: #666"] {
+    color: #8b949e !important;
+}
+
+html.sm-dark-theme [style*="border:1px solid #ddd"],
+html.sm-dark-theme [style*="border: 1px solid #ddd"],
+html.sm-dark-theme [style*="border:1px solid #eee"],
+html.sm-dark-theme [style*="border: 1px solid #eee"] {
+    border-color: #30363d !important;
+}
+
+/* --- Our extension's own dashboard (id-based overrides) ----------- */
+html.sm-dark-theme #sm-dashboard {
+    background: #0d1117 !important;
+    border-color: #30363d !important;
+    color: #e6edf3 !important;
+}
+
+html.sm-dark-theme #sm-dashboard > div {
+    background: #161b22 !important;
+    border-color: #30363d !important;
+    color: #e6edf3 !important;
+}
+
+html.sm-dark-theme #sm-dashboard [style*="color:#888"],
+html.sm-dark-theme #sm-dashboard [style*="color: #888"] {
+    color: #8b949e !important;
+}
+
+html.sm-dark-theme #sm-dashboard [style*="color:#999"],
+html.sm-dark-theme #sm-dashboard [style*="color: #999"] {
+    color: #6e7681 !important;
+}
+
+html.sm-dark-theme #sm-dashboard [style*="color:#28a745"] {
+    color: #3fb950 !important; /* brighter green for dark bg */
+}
+html.sm-dark-theme #sm-dashboard [style*="color:#d32f2f"] {
+    color: #f85149 !important; /* brighter red for dark bg */
+}
+
+html.sm-dark-theme #sm-dashboard [style*="background:#f8f9fa"] {
+    background: #161b22 !important;
+}
+html.sm-dark-theme #sm-dashboard [style*="background:#fff"] {
+    background: #21262d !important;
+}
+
+html.sm-dark-theme #sm-dashboard input,
+html.sm-dark-theme #sm-dashboard button {
+    /* keep existing look but with dark border */
+    border-color: #30363d !important;
+}
+
+html.sm-dark-theme #sm-dashboard #sm-load-btn {
+    background: #1976d2 !important;
+    color: #fff !important;
+    border-color: #1976d2 !important;
+}
+
+/* --- Scrollbar (Webkit) ------------------------------------------- */
+html.sm-dark-theme ::-webkit-scrollbar { width: 10px; height: 10px; }
+html.sm-dark-theme ::-webkit-scrollbar-track { background: #0d1117; }
+html.sm-dark-theme ::-webkit-scrollbar-thumb {
+    background: #30363d;
+    border-radius: 5px;
+}
+html.sm-dark-theme ::-webkit-scrollbar-thumb:hover { background: #484f58; }
+
+/* --- Selection ---------------------------------------------------- */
+html.sm-dark-theme ::selection { background: #58a6ff; color: #0d1117; }
+html.sm-dark-theme ::-moz-selection { background: #58a6ff; color: #0d1117; }
+
+/* --- Theme toggle button (in our dashboard) ----------------------- */
+#sm-theme-toggle {
+    cursor: pointer;
+    padding: 5px 12px;
+    font-size: 12px;
+    font-family: inherit;
+    background: #21262d;
+    color: #e6edf3;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    transition: background 0.15s, border-color 0.15s;
+    white-space: nowrap;
+}
+#sm-theme-toggle:hover {
+    background: #30363d;
+    border-color: #484f58;
+}
+#sm-theme-toggle:active { transform: translateY(1px); }
+
+#sm-dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #eee;
+}
+#sm-dashboard-header .sm-title {
+    font-size: 13px;
+    font-weight: bold;
+    color: #666;
+}
+
+html.sm-dark-theme #sm-dashboard-header {
+    border-bottom-color: #30363d !important;
+}
+html.sm-dark-theme #sm-dashboard-header .sm-title {
+    color: #8b949e !important;
+}
