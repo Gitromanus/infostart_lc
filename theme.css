@@ -651,14 +651,7 @@ html.sm-dark-theme #sm-dashboard #sm-load-btn {
     border-color: #1976d2 !important;
 }
 
-/* Строка с кнопками догрузки — кнопка темы прижата вправо */
-#sm-dashboard > div:last-of-type,
-#sm-dashboard [style*="display:flex"][style*="align-items:center"] {
-    justify-content: flex-start !important;
-}
-#sm-dashboard #sm-theme-toggle {
-    margin-left: auto !important;
-}
+/* Кнопка темы прижата вправо через margin-left:auto (задаётся в content.js) */
 
 /* === FOOTER ==================================================== */
 html.sm-dark-theme footer,
