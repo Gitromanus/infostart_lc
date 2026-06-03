@@ -5,7 +5,8 @@
 
 /* === BASE ====================================================== */
 html.sm-dark-theme,
-html.sm-dark-theme body {
+html.sm-dark-theme body,
+html.sm-dark-theme #main {
     background-color: #0d1117 !important;
     color: #e6edf3 !important;
 }
