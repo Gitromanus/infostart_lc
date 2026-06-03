@@ -66,6 +66,64 @@ html.sm-dark-theme [class*="header"] {
     border-color: #30363d !important;
 }
 
+/* === IS-D-HEADER (тёмная шапка инфостарта, биржевой стиль) ===== */
+html.sm-dark-theme .is-d-header {
+    background-color: #161b22 !important;
+    border-bottom: 1px solid #30363d !important;
+    color: #e6edf3 !important;
+}
+
+/* Кнопки/ссылки в правой части шапки (PRO, Подписка, иконки) === */
+html.sm-dark-theme .is-d-header a,
+html.sm-dark-theme .is-d-header [class*="btn"],
+html.sm-dark-theme .is-d-header [class*="button"],
+html.sm-dark-theme .is-d-header [class*="action"],
+html.sm-dark-theme .is-d-header [class*="link"] {
+    background-color: transparent !important;
+    color: #e6edf3 !important;
+    border: 1px solid #30363d !important;
+    border-radius: 6px !important;
+    padding: 5px 10px !important;
+    transition: background-color 0.15s, border-color 0.15s;
+}
+
+html.sm-dark-theme .is-d-header a:hover,
+html.sm-dark-theme .is-d-header [class*="btn"]:hover,
+html.sm-dark-theme .is-d-header [class*="button"]:hover,
+html.sm-dark-theme .is-d-header [class*="action"]:hover {
+    background-color: #21262d !important;
+    border-color: #484f58 !important;
+    color: #79c0ff !important;
+}
+
+/* PRO-бейдж — оставляем узнаваемым */
+html.sm-dark-theme .is-d-header [class*="pro"],
+html.sm-dark-theme .is-d-header [class*="PRO"] {
+    color: #79c0ff !important;
+    border-color: #58a6ff !important;
+}
+
+/* Иконки-кнопки (О компании, Контакты, Уведомления) — скруглённые */
+html.sm-dark-theme .is-d-header [class*="icon"],
+html.sm-dark-theme .is-d-header .fa,
+html.sm-dark-theme .is-d-header svg {
+    color: #e6edf3 !important;
+    background: transparent !important;
+}
+
+/* Поиск в шапке инфостарта */
+html.sm-dark-theme .is-d-header input[type="text"],
+html.sm-dark-theme .is-d-header input[type="search"] {
+    background-color: #0d1117 !important;
+    color: #e6edf3 !important;
+    border: 1px solid #30363d !important;
+    border-radius: 6px !important;
+}
+
+html.sm-dark-theme .is-d-header input::placeholder {
+    color: #6e7681 !important;
+}
+
 /* Поиск в шапке */
 html.sm-dark-theme header input,
 html.sm-dark-theme .header input,
@@ -476,6 +534,17 @@ html.sm-dark-theme .footer {
     background-color: #161b22 !important;
     color: #8b949e !important;
     border-color: #30363d !important;
+    border-top: 1px solid #30363d !important;
+}
+
+html.sm-dark-theme footer a,
+html.sm-dark-theme .footer a {
+    color: #8b949e !important;
+}
+
+html.sm-dark-theme footer a:hover,
+html.sm-dark-theme .footer a:hover {
+    color: #79c0ff !important;
 }
 
 /* === SCROLLBAR / SELECTION ===================================== */
