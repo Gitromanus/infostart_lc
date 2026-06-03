@@ -27,6 +27,7 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats', 'sm_dark_theme'], function(
 
     // 0. ПРИМЕНЕНИЕ ТЁМНОЙ ТЕМЫ
     // Класс на <html> — тему.css переопределяет стили инфостарта, когда класс есть
+    // ВАЖНО: применяем ТОЛЬКО на странице транзакций, иначе красим весь инфостарт
     const applyTheme = (enabled) => {
         if (enabled) {
             document.documentElement.classList.add('sm-dark-theme');
@@ -34,7 +35,8 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats', 'sm_dark_theme'], function(
             document.documentElement.classList.remove('sm-dark-theme');
         }
     };
-    applyTheme(darkTheme);
+    if (isTransact) applyTheme(darkTheme);
+    else applyTheme(false);
 
     // 1. ОБНОВЛЕНИЕ КУРСА С БИРЖИ
     // Фоновый fetch курса — срабатывает при каждом открытии любой страницы расширения
