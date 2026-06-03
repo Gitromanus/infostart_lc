@@ -109,6 +109,54 @@ html.sm-dark-theme .tabs a:hover {
     color: #79c0ff !important;
 }
 
+/* Bootstrap .nav-tabs + кастомные классы инфостарта */
+html.sm-dark-theme .nav-tabs,
+html.sm-dark-theme ul.nav-tabs,
+html.sm-dark-theme .tabs-pull-left,
+html.sm-dark-theme .tabs-pull-right {
+    background-color: transparent !important;
+    border-bottom: 1px solid #30363d !important;
+}
+
+html.sm-dark-theme .nav-tabs > li,
+html.sm-dark-theme .nav-tabs li,
+html.sm-dark-theme ul.nav-tabs > li,
+html.sm-dark-theme ul.tabs-pull-left > li {
+    background-color: transparent !important;
+    color: #e6edf3 !important;
+    border: none !important;
+}
+
+html.sm-dark-theme .nav-tabs > li > a,
+html.sm-dark-theme ul.nav-tabs > li > a,
+html.sm-dark-theme .root-item,
+html.sm-dark-theme .root-item-selected {
+    background-color: #161b22 !important;
+    color: #e6edf3 !important;
+    border: 1px solid #30363d !important;
+    border-bottom-color: transparent !important;
+    margin-right: 2px !important;
+}
+
+html.sm-dark-theme .nav-tabs > li.active > a,
+html.sm-dark-theme .nav-tabs > li.active > a:hover,
+html.sm-dark-theme .nav-tabs > li.active > a:focus,
+html.sm-dark-theme ul.nav-tabs > li.active > a,
+html.sm-dark-theme .root-item-selected,
+html.sm-dark-theme .root-item-selected:hover {
+    background-color: #0d1117 !important;
+    color: #58a6ff !important;
+    border-color: #30363d !important;
+    border-bottom-color: #0d1117 !important;
+}
+
+html.sm-dark-theme .nav-tabs > li > a:hover,
+html.sm-dark-theme .root-item:hover {
+    background-color: #21262d !important;
+    color: #79c0ff !important;
+    border-color: #30363d !important;
+}
+
 /* === CARDS / PANELS / SECTIONS ================================= */
 html.sm-dark-theme [class*="card"],
 html.sm-dark-theme [class*="panel"],
@@ -126,6 +174,8 @@ html.sm-dark-theme .content-block {
 }
 
 /* === FORMS / ФИЛЬТР-КАРТОЧКА (большой белый блок посередине) === */
+/* .well — это Bootstrap-обёртка формы фильтра, она-то и была белой */
+html.sm-dark-theme .well,
 html.sm-dark-theme form,
 html.sm-dark-theme .form,
 html.sm-dark-theme .filter,
@@ -135,6 +185,51 @@ html.sm-dark-theme [class*="form-"] {
     background-color: #161b22 !important;
     color: #e6edf3 !important;
     border-color: #30363d !important;
+    box-shadow: none !important;
+}
+
+/* Bootstrap grid columns + form-group (внутри фильтра) */
+html.sm-dark-theme .col,
+html.sm-dark-theme [class*="col-"],
+html.sm-dark-theme .form-group,
+html.sm-dark-theme .form-group > div,
+html.sm-dark-theme .form-group label {
+    background-color: transparent !important;
+    color: #e6edf3 !important;
+    border-color: transparent !important;
+}
+
+/* .form-control — input/select внутри формы */
+html.sm-dark-theme .form-control,
+html.sm-dark-theme input.form-control,
+html.sm-dark-theme select.form-control,
+html.sm-dark-theme textarea.form-control {
+    background-color: #0d1117 !important;
+    color: #e6edf3 !important;
+    border: 1px solid #30363d !important;
+}
+
+/* .input-group и addon-ы (иконка календаря) */
+html.sm-dark-theme .input-group {
+    background-color: transparent !important;
+    border-color: #30363d !important;
+}
+html.sm-dark-theme .input-group .form-control {
+    border-right: none !important;
+}
+html.sm-dark-theme .input-group-addon,
+html.sm-dark-theme .input-group-btn,
+html.sm-dark-theme .input-group-btn > .btn {
+    background-color: #21262d !important;
+    color: #e6edf3 !important;
+    border: 1px solid #30363d !important;
+    border-left: none !important;
+}
+html.sm-dark-theme .input-group-addon .fa,
+html.sm-dark-theme .input-group-addon i,
+html.sm-dark-theme .input-group-addon svg {
+    color: #8b949e !important;
+    background: transparent !important;
 }
 
 html.sm-dark-theme input,
@@ -192,6 +287,19 @@ html.sm-dark-theme [class*="btn-green"] {
     background-color: #1976d2 !important;
     color: #fff !important;
     border-color: #1976d2 !important;
+}
+
+/* .btn-default — обычные кнопки (Фильтровать, Сбросить) */
+html.sm-dark-theme .btn-default,
+html.sm-dark-theme [class*="btn-default"] {
+    background-color: #21262d !important;
+    color: #e6edf3 !important;
+    border: 1px solid #30363d !important;
+}
+html.sm-dark-theme .btn-default:hover,
+html.sm-dark-theme [class*="btn-default"]:hover {
+    background-color: #30363d !important;
+    border-color: #484f58 !important;
 }
 
 html.sm-dark-theme .btn-primary:hover,

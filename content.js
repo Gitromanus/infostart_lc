@@ -444,6 +444,12 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats', 'sm_dark_theme'], function(
                 cachedStats = combined;
             }
             renderInfo(cachedStats);
+            // На случай если dashboard есть, но renderInfo не обновил прогноз
+            // (например, sm-val-day не существовал в момент первого вызова)
+            const predBox = document.getElementById('sm-prediction-box');
+            if (predBox && predBox.innerText.includes('Загрузка')) {
+                drawPrediction(cachedStats);
+            }
         };
 
         const collectHistory = async () => {
@@ -482,6 +488,7 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats', 'sm_dark_theme'], function(
         setInterval(() => {
             createDashboard();
             updateTable();
+            autoSync(); // повторяем — таблица могла прогрузиться позже, а данных не было
         }, 3000);
     }
 }
