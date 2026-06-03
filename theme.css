@@ -69,59 +69,171 @@ html.sm-dark-theme [class*="header"] {
 /* === IS-D-HEADER (тёмная шапка инфостарта, биржевой стиль) ===== */
 html.sm-dark-theme .is-d-header {
     background-color: #161b22 !important;
-    border-bottom: 1px solid #30363d !important;
     color: #e6edf3 !important;
+    border-bottom: 1px solid #30363d !important;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.4);
 }
 
-/* Кнопки/ссылки в правой части шапки (PRO, Подписка, иконки) === */
-html.sm-dark-theme .is-d-header a,
-html.sm-dark-theme .is-d-header [class*="btn"],
-html.sm-dark-theme .is-d-header [class*="button"],
-html.sm-dark-theme .is-d-header [class*="action"],
-html.sm-dark-theme .is-d-header [class*="link"] {
+/* Три блока шапки + все их обёртки — прозрачные, чтобы был виден фон .is-d-header */
+html.sm-dark-theme .is-d-header__top,
+html.sm-dark-theme .is-d-header__main,
+html.sm-dark-theme .is-d-header__bottom,
+html.sm-dark-theme .is-d-header-top,
+html.sm-dark-theme .is-d-header-main,
+html.sm-dark-theme .is-d-header-bottom,
+html.sm-dark-theme .is-d-header-top__wrapper,
+html.sm-dark-theme .is-d-header-bottom__wrapper,
+html.sm-dark-theme .is-d-header .is-container,
+html.sm-dark-theme .is-d-header-top__container,
+html.sm-dark-theme .is-d-header-main__container,
+html.sm-dark-theme .is-d-header-bottom__container {
+    background-color: transparent !important;
+}
+
+/* Разделители между секциями шапки */
+html.sm-dark-theme .is-d-header__top,
+html.sm-dark-theme .is-d-header__main {
+    border-bottom: 1px solid #30363d !important;
+}
+
+/* === TOOL BUTTONS в правом меню (PRO, О компании, Контакты…) === */
+html.sm-dark-theme .is-tool-button {
     background-color: transparent !important;
     color: #e6edf3 !important;
     border: 1px solid #30363d !important;
     border-radius: 6px !important;
     padding: 5px 10px !important;
-    transition: background-color 0.15s, border-color 0.15s;
+    transition: background-color 0.15s, border-color 0.15s, color 0.15s;
 }
 
-html.sm-dark-theme .is-d-header a:hover,
-html.sm-dark-theme .is-d-header [class*="btn"]:hover,
-html.sm-dark-theme .is-d-header [class*="button"]:hover,
-html.sm-dark-theme .is-d-header [class*="action"]:hover {
+html.sm-dark-theme .is-tool-button:hover {
     background-color: #21262d !important;
     border-color: #484f58 !important;
     color: #79c0ff !important;
 }
 
-/* PRO-бейдж — оставляем узнаваемым */
-html.sm-dark-theme .is-d-header [class*="pro"],
-html.sm-dark-theme .is-d-header [class*="PRO"] {
+/* PRO-кнопка выделена синим */
+html.sm-dark-theme .is-tool-button.is-tool-button_color--danger,
+html.sm-dark-theme .is-tool-button_color--danger {
     color: #79c0ff !important;
     border-color: #58a6ff !important;
+    background-color: rgba(88,166,255,0.08) !important;
 }
 
-/* Иконки-кнопки (О компании, Контакты, Уведомления) — скруглённые */
-html.sm-dark-theme .is-d-header [class*="icon"],
-html.sm-dark-theme .is-d-header .fa,
-html.sm-dark-theme .is-d-header svg {
+html.sm-dark-theme .is-tool-button_color--danger:hover {
+    background-color: rgba(88,166,255,0.18) !important;
+    border-color: #79c0ff !important;
+    color: #c9d1d9 !important;
+}
+
+/* === ICON BUTTONS (бургер, иконка поиска) ====================== */
+html.sm-dark-theme .is-icon-button {
+    background-color: transparent !important;
     color: #e6edf3 !important;
-    background: transparent !important;
+    border: 1px solid transparent !important;
+    border-radius: 6px !important;
+    padding: 5px !important;
+    transition: background-color 0.15s, border-color 0.15s;
 }
 
-/* Поиск в шапке инфостарта */
-html.sm-dark-theme .is-d-header input[type="text"],
-html.sm-dark-theme .is-d-header input[type="search"] {
-    background-color: #0d1117 !important;
+html.sm-dark-theme .is-icon-button:hover {
+    background-color: #21262d !important;
+    border-color: #30363d !important;
+}
+
+html.sm-dark-theme .is-icon,
+html.sm-dark-theme .is-icon use,
+html.sm-dark-theme svg.is-icon {
+    color: #e6edf3 !important;
+    fill: #e6edf3 !important;
+}
+
+/* === SEARCH ====================================================== */
+html.sm-dark-theme .is-search,
+html.sm-dark-theme .is-search__input,
+html.sm-dark-theme .is-input {
+    background-color: transparent !important;
+}
+
+html.sm-dark-theme .is-input {
     color: #e6edf3 !important;
     border: 1px solid #30363d !important;
     border-radius: 6px !important;
+    padding: 6px 10px !important;
 }
 
-html.sm-dark-theme .is-d-header input::placeholder {
+html.sm-dark-theme .is-input::placeholder {
     color: #6e7681 !important;
+    opacity: 1;
+}
+
+html.sm-dark-theme .is-input:focus {
+    border-color: #58a6ff !important;
+    outline: none !important;
+    box-shadow: 0 0 0 1px #58a6ff !important;
+}
+
+html.sm-dark-theme .is-search__submit .is-icon-button {
+    border: 1px solid #30363d !important;
+    border-left: none !important;
+    border-radius: 0 6px 6px 0 !important;
+}
+
+/* === AVATAR BUTTON ============================================== */
+html.sm-dark-theme .is-avatar-button {
+    background-color: transparent !important;
+    border: 1px solid #30363d !important;
+    border-radius: 50% !important;
+    padding: 2px !important;
+    overflow: hidden;
+}
+
+html.sm-dark-theme .is-avatar-button:hover {
+    border-color: #58a6ff !important;
+}
+
+html.sm-dark-theme .is-avatar {
+    background-color: #21262d !important;
+    border-radius: 50% !important;
+}
+
+/* === LOGO + "Личный кабинет" ================================== */
+html.sm-dark-theme .is-logo,
+html.sm-dark-theme .is-image {
+    background: transparent !important;
+}
+
+html.sm-dark-theme .is-d-header-main-logo__description {
+    color: #8b949e !important;
+}
+
+/* === SECTION MENU (Избранное, Профиль, Личный счет…) — БЕЗ РАМОК == */
+html.sm-dark-theme .is-section-menu,
+html.sm-dark-theme .is-section-menu-item,
+html.sm-dark-theme .is-section-menu-item__link,
+html.sm-dark-theme .is-section-menu__item {
+    background-color: transparent !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    color: #e6edf3 !important;
+    box-shadow: none !important;
+}
+
+html.sm-dark-theme .is-section-menu-item__link {
+    color: #e6edf3 !important;
+    border: none !important;
+    padding: 8px 12px !important;
+}
+
+html.sm-dark-theme .is-section-menu-item__link:hover {
+    color: #79c0ff !important;
+    background: transparent !important;
+}
+
+html.sm-dark-theme .is-section-menu-item__icon {
+    color: #8b949e !important;
 }
 
 /* Поиск в шапке */
