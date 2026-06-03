@@ -6,7 +6,7 @@
   "host_permissions": ["https://infostart.ru/*"],
   "content_scripts": [
     {
-      "matches": ["https://infostart.ru/*"],
+      "matches": ["https://infostart.ru/profile/money/transact/*"],
       "js": ["content.js"],
       "css": ["theme.css"],
       "run_at": "document_start"
