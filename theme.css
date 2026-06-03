@@ -1,13 +1,17 @@
 /* =====================================================================
    SM Dashboard — Dark theme for infostart.ru
-   All rules are scoped under `html.sm-dark-theme` so toggling is instant
-   and side-effect free. Override colors mimic the GitHub dark palette.
+   v1.5.1 — перекрашиваем header, навигацию, фильтр, пагинацию, таблицу
    ===================================================================== */
 
+/* === BASE ====================================================== */
 html.sm-dark-theme,
 html.sm-dark-theme body {
     background-color: #0d1117 !important;
     color: #e6edf3 !important;
+}
+
+html.sm-dark-theme *:not(img):not(picture):not(video):not(iframe):not(svg):not(path):not(canvas) {
+    border-color: #30363d !important;
 }
 
 html.sm-dark-theme a,
@@ -28,89 +32,124 @@ html.sm-dark-theme .text-muted {
     color: #8b949e !important;
 }
 
-/* --- Header / nav / footer ----------------------------------------- */
+html.sm-dark-theme ul,
+html.sm-dark-theme ol {
+    background-color: transparent !important;
+    color: #e6edf3 !important;
+}
+
+html.sm-dark-theme li { color: #e6edf3 !important; }
+
+html.sm-dark-theme .active,
+html.sm-dark-theme [class*="active"],
+html.sm-dark-theme [aria-current="page"],
+html.sm-dark-theme .selected,
+html.sm-dark-theme [class*="selected"],
+html.sm-dark-theme .current {
+    color: #58a6ff !important;
+    border-color: #58a6ff !important;
+}
+
+/* === HEADER (верхний бар с логотипом, поиском, юзер-меню) ====== */
+html.sm-dark-theme body > header,
+html.sm-dark-theme body > div > header,
+html.sm-dark-theme body > div:first-child > header,
 html.sm-dark-theme header,
 html.sm-dark-theme .header,
 html.sm-dark-theme .top-bar,
-html.sm-dark-theme .navbar,
-html.sm-dark-theme nav,
-html.sm-dark-theme .nav,
-html.sm-dark-theme .menu,
-html.sm-dark-theme footer,
-html.sm-dark-theme .footer {
+html.sm-dark-theme .topbar,
+html.sm-dark-theme .top-header,
+html.sm-dark-theme #header,
+html.sm-dark-theme [class*="header"] {
     background-color: #161b22 !important;
     color: #e6edf3 !important;
     border-color: #30363d !important;
 }
 
-/* --- Main content wrappers ----------------------------------------- */
-html.sm-dark-theme .container,
-html.sm-dark-theme .wrapper,
-html.sm-dark-theme main,
-html.sm-dark-theme .main,
-html.sm-dark-theme .content,
-html.sm-dark-theme .page-content {
+/* Поиск в шапке */
+html.sm-dark-theme header input,
+html.sm-dark-theme .header input,
+html.sm-dark-theme [class*="header"] input,
+html.sm-dark-theme [class*="search"] {
     background-color: #0d1117 !important;
+    color: #e6edf3 !important;
+    border: 1px solid #30363d !important;
+}
+
+/* === NAV (обе строки: личный кабинет + раздел) ================= */
+html.sm-dark-theme nav,
+html.sm-dark-theme .nav,
+html.sm-dark-theme .navbar,
+html.sm-dark-theme .menu,
+html.sm-dark-theme ul.menu,
+html.sm-dark-theme .navigation,
+html.sm-dark-theme .tabs,
+html.sm-dark-theme .tab-list,
+html.sm-dark-theme [class*="nav-"],
+html.sm-dark-theme [class*="menu-"],
+html.sm-dark-theme [class*="tab-"] {
+    background-color: #161b22 !important;
+    color: #e6edf3 !important;
+    border-color: #30363d !important;
+}
+
+html.sm-dark-theme nav a,
+html.sm-dark-theme .nav a,
+html.sm-dark-theme .menu a,
+html.sm-dark-theme .tabs a,
+html.sm-dark-theme .tab-list a,
+html.sm-dark-theme [class*="tab"] a {
     color: #e6edf3 !important;
 }
 
-/* --- Cards / panels / white-blocks --------------------------------- */
+html.sm-dark-theme nav a:hover,
+html.sm-dark-theme .nav a:hover,
+html.sm-dark-theme .menu a:hover,
+html.sm-dark-theme .tabs a:hover {
+    color: #79c0ff !important;
+}
+
+/* === CARDS / PANELS / SECTIONS ================================= */
 html.sm-dark-theme [class*="card"],
 html.sm-dark-theme [class*="panel"],
 html.sm-dark-theme [class*="block"],
 html.sm-dark-theme [class*="widget"],
+html.sm-dark-theme [class*="section"],
 html.sm-dark-theme .white-block,
 html.sm-dark-theme .bx-white-block,
-html.sm-dark-theme .task-card,
-html.sm-dark-theme .item,
-html.sm-dark-theme .task,
-html.sm-dark-theme .order,
 html.sm-dark-theme .sidebar,
-html.sm-dark-theme aside {
+html.sm-dark-theme aside,
+html.sm-dark-theme .content-block {
     background-color: #161b22 !important;
     color: #e6edf3 !important;
     border-color: #30363d !important;
 }
 
-/* --- Tables -------------------------------------------------------- */
-html.sm-dark-theme table {
+/* === FORMS / ФИЛЬТР-КАРТОЧКА (большой белый блок посередине) === */
+html.sm-dark-theme form,
+html.sm-dark-theme .form,
+html.sm-dark-theme .filter,
+html.sm-dark-theme .filters,
+html.sm-dark-theme [class*="filter"],
+html.sm-dark-theme [class*="form-"] {
     background-color: #161b22 !important;
     color: #e6edf3 !important;
     border-color: #30363d !important;
 }
 
-html.sm-dark-theme th,
-html.sm-dark-theme thead td,
-html.sm-dark-theme thead th {
-    background-color: #21262d !important;
-    color: #e6edf3 !important;
-    border-color: #30363d !important;
-}
-
-html.sm-dark-theme td,
-html.sm-dark-theme tbody tr,
-html.sm-dark-theme tfoot tr {
-    background-color: transparent !important;
-    color: #e6edf3 !important;
-    border-color: #30363d !important;
-}
-
-html.sm-dark-theme tr:nth-child(even) td,
-html.sm-dark-theme tr:nth-child(even) {
-    background-color: #1c2128 !important;
-}
-
-html.sm-dark-theme tr:hover td {
-    background-color: #21262d !important;
-}
-
-/* --- Forms --------------------------------------------------------- */
 html.sm-dark-theme input,
 html.sm-dark-theme select,
 html.sm-dark-theme textarea {
     background-color: #0d1117 !important;
     color: #e6edf3 !important;
     border: 1px solid #30363d !important;
+}
+
+html.sm-dark-theme input[type="checkbox"],
+html.sm-dark-theme input[type="radio"] {
+    background-color: #0d1117 !important;
+    border: 1px solid #30363d !important;
+    accent-color: #58a6ff;
 }
 
 html.sm-dark-theme input::placeholder,
@@ -127,11 +166,9 @@ html.sm-dark-theme textarea:focus {
     box-shadow: 0 0 0 1px #58a6ff !important;
 }
 
-html.sm-dark-theme label {
-    color: #e6edf3 !important;
-}
+html.sm-dark-theme label { color: #e6edf3 !important; }
 
-/* --- Buttons ------------------------------------------------------- */
+/* === BUTTONS =================================================== */
 html.sm-dark-theme button,
 html.sm-dark-theme .btn,
 html.sm-dark-theme [class*="button"] {
@@ -163,7 +200,77 @@ html.sm-dark-theme [class*="btn-primary"]:hover {
     border-color: #1565c0 !important;
 }
 
-/* --- Inline-style overrides (catches pages that hardcode bg colors) */
+/* === PAGINATION (1 2 3 4 5 Следующая) ========================= */
+html.sm-dark-theme .pagination,
+html.sm-dark-theme .pager,
+html.sm-dark-theme .modern-page-navigation,
+html.sm-dark-theme [class*="pagination"],
+html.sm-dark-theme [class*="pager"] {
+    background-color: transparent !important;
+    color: #e6edf3 !important;
+    border-color: transparent !important;
+}
+
+html.sm-dark-theme .pagination a,
+html.sm-dark-theme .pagination span,
+html.sm-dark-theme .pager a,
+html.sm-dark-theme .pager span,
+html.sm-dark-theme [class*="pagination"] a,
+html.sm-dark-theme [class*="pagination"] span {
+    background-color: #21262d !important;
+    color: #e6edf3 !important;
+    border: 1px solid #30363d !important;
+}
+
+html.sm-dark-theme .pagination a:hover,
+html.sm-dark-theme [class*="pagination"] a:hover {
+    background-color: #30363d !important;
+    border-color: #484f58 !important;
+}
+
+html.sm-dark-theme .pagination .active,
+html.sm-dark-theme .pagination a.active,
+html.sm-dark-theme .pagination .current,
+html.sm-dark-theme [class*="pagination"] .active,
+html.sm-dark-theme [class*="pagination"] a.active {
+    background-color: #1976d2 !important;
+    color: #fff !important;
+    border-color: #1976d2 !important;
+}
+
+/* === TABLES (таблица транзакций) =============================== */
+html.sm-dark-theme table {
+    background-color: #161b22 !important;
+    color: #e6edf3 !important;
+    border-color: #30363d !important;
+}
+
+html.sm-dark-theme th,
+html.sm-dark-theme thead th,
+html.sm-dark-theme thead td {
+    background-color: #21262d !important;
+    color: #e6edf3 !important;
+    border-color: #30363d !important;
+}
+
+html.sm-dark-theme td,
+html.sm-dark-theme tbody td,
+html.sm-dark-theme tfoot td {
+    background-color: transparent !important;
+    color: #e6edf3 !important;
+    border-color: #30363d !important;
+}
+
+html.sm-dark-theme tr:nth-child(even) td,
+html.sm-dark-theme tr:nth-child(even) {
+    background-color: #1c2128 !important;
+}
+
+html.sm-dark-theme tr:hover td {
+    background-color: #21262d !important;
+}
+
+/* === INLINE-STYLE OVERRIDES (catch-all для хардкод-белых фонов) === */
 html.sm-dark-theme [style*="background:#fff"],
 html.sm-dark-theme [style*="background: #fff"],
 html.sm-dark-theme [style*="background:#FFF"],
@@ -176,15 +283,14 @@ html.sm-dark-theme [style*="background: white"] {
 
 html.sm-dark-theme [style*="background:#f8f9fa"],
 html.sm-dark-theme [style*="background: #f8f9fa"],
+html.sm-dark-theme [style*="background:#fafafa"],
+html.sm-dark-theme [style*="background: #fafafa"],
 html.sm-dark-theme [style*="background:#f5f5f5"],
-html.sm-dark-theme [style*="background: #f5f5f5"] {
+html.sm-dark-theme [style*="background: #f5f5f5"],
+html.sm-dark-theme [style*="background:#f"],
+html.sm-dark-theme [style*="background: #f"] {
     background: #161b22 !important;
     color: #e6edf3 !important;
-}
-
-html.sm-dark-theme [style*="background:#fafafa"],
-html.sm-dark-theme [style*="background: #fafafa"] {
-    background: #0d1117 !important;
 }
 
 html.sm-dark-theme [style*="color:#333"],
@@ -208,7 +314,7 @@ html.sm-dark-theme [style*="border: 1px solid #eee"] {
     border-color: #30363d !important;
 }
 
-/* --- Our extension's own dashboard (id-based overrides) ----------- */
+/* === OUR EXTENSION'S DASHBOARD ================================= */
 html.sm-dark-theme #sm-dashboard {
     background: #0d1117 !important;
     border-color: #30363d !important;
@@ -232,10 +338,10 @@ html.sm-dark-theme #sm-dashboard [style*="color: #999"] {
 }
 
 html.sm-dark-theme #sm-dashboard [style*="color:#28a745"] {
-    color: #3fb950 !important; /* brighter green for dark bg */
+    color: #3fb950 !important;
 }
 html.sm-dark-theme #sm-dashboard [style*="color:#d32f2f"] {
-    color: #f85149 !important; /* brighter red for dark bg */
+    color: #f85149 !important;
 }
 
 html.sm-dark-theme #sm-dashboard [style*="background:#f8f9fa"] {
@@ -247,7 +353,6 @@ html.sm-dark-theme #sm-dashboard [style*="background:#fff"] {
 
 html.sm-dark-theme #sm-dashboard input,
 html.sm-dark-theme #sm-dashboard button {
-    /* keep existing look but with dark border */
     border-color: #30363d !important;
 }
 
@@ -257,20 +362,23 @@ html.sm-dark-theme #sm-dashboard #sm-load-btn {
     border-color: #1976d2 !important;
 }
 
-/* --- Scrollbar (Webkit) ------------------------------------------- */
+/* === FOOTER ==================================================== */
+html.sm-dark-theme footer,
+html.sm-dark-theme .footer {
+    background-color: #161b22 !important;
+    color: #8b949e !important;
+    border-color: #30363d !important;
+}
+
+/* === SCROLLBAR / SELECTION ===================================== */
 html.sm-dark-theme ::-webkit-scrollbar { width: 10px; height: 10px; }
 html.sm-dark-theme ::-webkit-scrollbar-track { background: #0d1117; }
-html.sm-dark-theme ::-webkit-scrollbar-thumb {
-    background: #30363d;
-    border-radius: 5px;
-}
+html.sm-dark-theme ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 5px; }
 html.sm-dark-theme ::-webkit-scrollbar-thumb:hover { background: #484f58; }
-
-/* --- Selection ---------------------------------------------------- */
 html.sm-dark-theme ::selection { background: #58a6ff; color: #0d1117; }
 html.sm-dark-theme ::-moz-selection { background: #58a6ff; color: #0d1117; }
 
-/* --- Theme toggle button (in our dashboard) ----------------------- */
+/* === THEME TOGGLE BUTTON (в нашем дашборде) =================== */
 #sm-theme-toggle {
     cursor: pointer;
     padding: 5px 12px;
