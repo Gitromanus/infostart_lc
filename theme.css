@@ -61,11 +61,7 @@ html.sm-dark-theme .top-bar,
 html.sm-dark-theme .topbar,
 html.sm-dark-theme .top-header,
 html.sm-dark-theme #header,
-html.sm-dark-theme [class*="header"] {
-    background-color: #161b22 !important;
-    color: #e6edf3 !important;
-    border-color: #30363d !important;
-}
+/* [class*="header"] убран — слишком жадный, красил биржу заказов и чужие страницы */
 
 /* === IS-D-HEADER (тёмная шапка инфостарта, биржевой стиль) ===== */
 html.sm-dark-theme .is-d-header {
@@ -516,6 +512,21 @@ html.sm-dark-theme [class*="pagination"] a.active {
     border-color: #1976d2 !important;
 }
 
+/* === ЦВЕТА ТРАНЗАКЦИЙ (сохраняем зелёный/красный) ============= */
+html.sm-dark-theme .txt-color-green,
+html.sm-dark-theme td.txt-color-green {
+    color: #3fb950 !important;
+}
+/* .sm-done внутри зелёной ячейки остаётся красным */
+html.sm-dark-theme .txt-color-green .sm-done {
+    color: #f85149 !important;
+}
+html.sm-dark-theme .txt-color-red,
+html.sm-dark-theme td.txt-color-red,
+html.sm-dark-theme .txt-color-red * {
+    color: #f85149 !important;
+}
+
 /* === TABLES (таблица транзакций) =============================== */
 html.sm-dark-theme table {
     background-color: #161b22 !important;
@@ -638,6 +649,15 @@ html.sm-dark-theme #sm-dashboard #sm-load-btn {
     background: #1976d2 !important;
     color: #fff !important;
     border-color: #1976d2 !important;
+}
+
+/* Строка с кнопками догрузки — кнопка темы прижата вправо */
+#sm-dashboard > div:last-of-type,
+#sm-dashboard [style*="display:flex"][style*="align-items:center"] {
+    justify-content: flex-start !important;
+}
+#sm-dashboard #sm-theme-toggle {
+    margin-left: auto !important;
 }
 
 /* === FOOTER ==================================================== */
