@@ -7,6 +7,24 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats', 'sm_dark_theme'], function(
 
     const isTransact = window.location.href.includes('transact');
 
+    // Защита от «Extension context invalidated» (если расширение перезагрузили
+    // пока страница открыта) — вызываем location.reload() и страница подхватит
+    // новый content-скрипт. Без этого в консоли сыпятся ошибки.
+    const safeStorageSet = (data) => {
+        try {
+            chrome.storage.local.set(data);
+        } catch (e) {
+            if (e && e.message && e.message.includes('Extension context invalidated')) {
+                console.warn('SM Dashboard: расширение перезагружено, обновляю страницу…');
+                location.reload();
+                return false;
+            }
+            console.error('SM Dashboard: storage error', e);
+            return false;
+        }
+        return true;
+    };
+
     // 0. ПРИМЕНЕНИЕ ТЁМНОЙ ТЕМЫ
     // Класс на <html> — тему.css переопределяет стили инфостарта, когда класс есть
     const applyTheme = (enabled) => {
@@ -35,7 +53,7 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats', 'sm_dark_theme'], function(
                 console.log('SM курс найден:', rateMatch ? rateMatch[1] : null);
                 const newRate = rateMatch ? parseFloat(rateMatch[1].replace(',', '.')) : NaN;
                 if (!isNaN(newRate) && newRate > 0 && newRate < 100000) {
-                    chrome.storage.local.set({ 'sm_rate': newRate });
+                    safeStorageSet({ 'sm_rate': newRate });
                     currentRate = newRate;
                     console.log('Курс SM обновлен (фон):', currentRate);
                     // Обновляем дашборд через storage — так renderInfo подхватит новый курс
@@ -166,9 +184,12 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats', 'sm_dark_theme'], function(
                 themeBtn.onclick = () => {
                     darkTheme = !darkTheme;
                     applyTheme(darkTheme);
-                    chrome.storage.local.set({ 'sm_dark_theme': darkTheme });
-                    themeBtn.innerText = darkTheme ? '☀️ Светлая' : '🌙 Тёмная';
-                    themeBtn.title = darkTheme ? 'Переключить на светлую тему' : 'Переключить на тёмную тему';
+                    if (safeStorageSet({ 'sm_dark_theme': darkTheme })) {
+                        themeBtn.innerText = darkTheme ? '☀️ Светлая' : '🌙 Тёмная';
+                        themeBtn.title = darkTheme ? 'Переключить на светлую тему' : 'Переключить на тёмную тему';
+                    }
+                    // если safeStorageSet вернул false — значит расширение перезагрузили,
+                    // страница сама reload'нется через safeStorageSet
                 };
             }
         };
@@ -440,7 +461,7 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats', 'sm_dark_theme'], function(
                 if (!combined.find(x => x.id === r.id)) { combined.push(r); changed = true; }
             });
             if (changed) {
-                chrome.storage.local.set({ 'sm_all_stats': combined });
+                safeStorageSet({ 'sm_all_stats': combined });
                 cachedStats = combined;
             }
             renderInfo(cachedStats);
@@ -473,12 +494,11 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats', 'sm_dark_theme'], function(
                     await new Promise(r => setTimeout(r, 200)); // Защита от 503
                 } catch (e) {}
             }
-            chrome.storage.local.set({ 'sm_all_stats': results }, () => {
-                cachedStats = results;
-                renderInfo(results);
-                btn.disabled = false;
-                status.innerText = '✅ Готово';
-            });
+            safeStorageSet({ 'sm_all_stats': results });
+            cachedStats = results;
+            renderInfo(results);
+            btn.disabled = false;
+            status.innerText = '✅ Готово';
         };
 
         createDashboard();

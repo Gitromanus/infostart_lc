@@ -96,49 +96,46 @@ html.sm-dark-theme .is-d-header__main {
     border-bottom: 1px solid #30363d !important;
 }
 
-/* === TOOL BUTTONS в правом меню (PRO, О компании, Контакты…) === */
+/* === TOOL BUTTONS в правом меню (PRO, О компании, Контакты…) — ТЕКСТ БЕЗ РАМОК === */
 html.sm-dark-theme .is-tool-button {
     background-color: transparent !important;
     color: #e6edf3 !important;
-    border: 1px solid #30363d !important;
-    border-radius: 6px !important;
-    padding: 5px 10px !important;
-    transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 5px 8px !important;
+    transition: color 0.15s;
 }
 
 html.sm-dark-theme .is-tool-button:hover {
-    background-color: #21262d !important;
-    border-color: #484f58 !important;
     color: #79c0ff !important;
+    background-color: transparent !important;
 }
 
-/* PRO-кнопка выделена синим */
+/* PRO-кнопка — только синий текст, без рамки (как на бирже) */
 html.sm-dark-theme .is-tool-button.is-tool-button_color--danger,
 html.sm-dark-theme .is-tool-button_color--danger {
     color: #79c0ff !important;
-    border-color: #58a6ff !important;
-    background-color: rgba(88,166,255,0.08) !important;
+    border: none !important;
+    background-color: transparent !important;
 }
 
 html.sm-dark-theme .is-tool-button_color--danger:hover {
-    background-color: rgba(88,166,255,0.18) !important;
-    border-color: #79c0ff !important;
     color: #c9d1d9 !important;
 }
 
-/* === ICON BUTTONS (бургер, иконка поиска) ====================== */
+/* === ICON BUTTONS (бургер, иконка поиска) — ТОЖЕ БЕЗ РАМОК ====== */
 html.sm-dark-theme .is-icon-button {
     background-color: transparent !important;
     color: #e6edf3 !important;
-    border: 1px solid transparent !important;
-    border-radius: 6px !important;
+    border: none !important;
+    border-radius: 0 !important;
     padding: 5px !important;
-    transition: background-color 0.15s, border-color 0.15s;
+    transition: color 0.15s;
 }
 
 html.sm-dark-theme .is-icon-button:hover {
-    background-color: #21262d !important;
-    border-color: #30363d !important;
+    color: #79c0ff !important;
+    background-color: transparent !important;
 }
 
 html.sm-dark-theme .is-icon,
@@ -179,22 +176,24 @@ html.sm-dark-theme .is-search__submit .is-icon-button {
     border-radius: 0 6px 6px 0 !important;
 }
 
-/* === AVATAR BUTTON ============================================== */
+/* === AVATAR BUTTON — лёгкая обводка =========================== */
 html.sm-dark-theme .is-avatar-button {
     background-color: transparent !important;
-    border: 1px solid #30363d !important;
+    border: none !important;
     border-radius: 50% !important;
-    padding: 2px !important;
+    padding: 0 !important;
     overflow: hidden;
-}
-
-html.sm-dark-theme .is-avatar-button:hover {
-    border-color: #58a6ff !important;
 }
 
 html.sm-dark-theme .is-avatar {
     background-color: #21262d !important;
+    border: 1px solid #30363d !important;
     border-radius: 50% !important;
+    transition: border-color 0.15s;
+}
+
+html.sm-dark-theme .is-avatar-button:hover .is-avatar {
+    border-color: #58a6ff !important;
 }
 
 /* === LOGO + "Личный кабинет" ================================== */
