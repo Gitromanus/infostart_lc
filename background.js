@@ -92,10 +92,10 @@ function showNotification(title, message) {
         priority: 2
     });
 
-    // Авто-закрытие через 5 секунд
+    // Авто-закрытие через 10 секунд
     setTimeout(() => {
         chrome.notifications.clear(id);
-    }, 5000);
+    }, 10000);
 }
 
 // Клик по уведомлению — открываем страницу транзакций
