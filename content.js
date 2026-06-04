@@ -1,3 +1,4 @@
+console.log('SM content.js: скрипт загружен, URL:', window.location.href);
 chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
     let currentRate = result.sm_rate || 170;
     let cachedStats = result.sm_all_stats || [];
@@ -38,23 +39,27 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
     // 1. ОБНОВЛЕНИЕ КУРСА С БИРЖИ
     // Фоновый fetch курса — срабатывает при каждом открытии любой страницы расширения
     const fetchRateInBackground = () => {
+        console.log('SM content.js fetchRateInBackground: начинаю запрос к бирже');
         const stockUrl = 'https://infostart.ru/profile/money/stockexchange/';
         fetch(stockUrl, { credentials: 'include' })
             .then(resp => {
-                console.log('SM fetch статус:', resp.status, resp.url);
+                console.log('SM content.js fetch статус:', resp.status, resp.url);
                 return resp.arrayBuffer();
             })
             .then(buf => {
+                console.log('SM content.js fetch: получен ArrayBuffer, размер', buf.byteLength);
                 const html = decodeResponse(buf);
+                console.log('SM content.js fetch: HTML длина', html.length, 'первые 300 символов:', html.substring(0, 300));
                 // Курс в <span class="exh-buy-row">157</span> после текста "Текущий:"
                 // Ищем курс regex прямо в HTML: <span class="exh-buy-row">157</span>
                 const rateMatch = html.match(/<span class=["']exh-sale-row["']>\s*([\d,.]+)\s*<\/span>/);
-                console.log('SM курс найден:', rateMatch ? rateMatch[1] : null);
+                console.log('SM content.js курс найден:', rateMatch ? rateMatch[1] : 'НЕ НАЙДЕНО');
                 const newRate = rateMatch ? parseFloat(rateMatch[1].replace(',', '.')) : NaN;
+                console.log('SM content.js распаршенный курс:', newRate);
                 if (!isNaN(newRate) && newRate > 0 && newRate < 100000) {
                     chrome.storage.local.set({ 'sm_rate': newRate });
                     currentRate = newRate;
-                    console.log('Курс SM обновлен (фон):', currentRate);
+                    console.log('SM content.js курс обновлен:', currentRate);
                     // Уведомление в background об изменении курса
                     chrome.runtime.sendMessage({ type: 'RATE_UPDATED', rate: newRate }).catch(() => {});
                     // Обновляем дашборд через storage — так renderInfo подхватит новый курс
@@ -100,9 +105,11 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                             });
                         }
                     });
+                } else {
+                    console.log('SM content.js курс НЕ валидный:', newRate);
                 }
             })
-            .catch(e => console.log('Ошибка получения курса:', e));
+            .catch(e => console.log('SM content.js Ошибка получения курса:', e));
     };
 
     if (isTransact) {
