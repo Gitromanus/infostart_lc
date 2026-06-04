@@ -74,28 +74,45 @@ function decodeResponse(buf) {
 
 // Фоновый запрос курса с биржи
 function fetchRateFromBackground() {
+    console.log('SM fetchRateFromBackground: начинаю запрос к бирже');
     fetch('https://infostart.ru/profile/money/stockexchange/', { credentials: 'include' })
-        .then(resp => resp.arrayBuffer())
+        .then(resp => {
+            console.log('SM fetchRateFromBackground: статус ответа', resp.status, resp.url);
+            return resp.arrayBuffer();
+        })
         .then(buf => {
+            console.log('SM fetchRateFromBackground: получен ArrayBuffer, размер', buf.byteLength);
             const html = decodeResponse(buf);
+            console.log('SM fetchRateFromBackground: HTML длина', html.length, 'первые 500 символов:', html.substring(0, 500));
             const rateMatch = html.match(/<span class=["']exh-sale-row["']>\s*([\d,.]+)\s*<\/span>/);
+            console.log('SM fetchRateFromBackground: совпадение regex', rateMatch ? rateMatch[1] : 'НЕ НАЙДЕНО');
             const newRate = rateMatch ? parseFloat(rateMatch[1].replace(',', '.')) : NaN;
+            console.log('SM fetchRateFromBackground: распаршенный курс', newRate);
             if (!isNaN(newRate) && newRate > 0 && newRate < 100000) {
+                console.log('SM fetchRateFromBackground: курс валидный, сохраняю', newRate);
                 chrome.storage.local.set({ 'sm_rate': newRate });
                 handleRateUpdate(newRate);
+            } else {
+                console.log('SM fetchRateFromBackground: курс НЕ валидный', newRate);
             }
         })
-        .catch(() => {});
+        .catch(err => console.log('SM fetchRateFromBackground: ОШИБКА', err));
 }
 
 // Фоновый запрос транзакций
 function fetchTransactionsFromBackground() {
+    console.log('SM fetchTransactionsFromBackground: начинаю запрос транзакций');
     fetch('https://infostart.ru/profile/money/transact/', { credentials: 'include' })
-        .then(resp => resp.arrayBuffer())
+        .then(resp => {
+            console.log('SM fetchTransactionsFromBackground: статус ответа', resp.status, resp.url);
+            return resp.arrayBuffer();
+        })
         .then(buf => {
+            console.log('SM fetchTransactionsFromBackground: получен ArrayBuffer, размер', buf.byteLength);
             const html = decodeResponse(buf);
             const doc = new DOMParser().parseFromString(html, 'text/html');
             const rows = doc.querySelectorAll('tr');
+            console.log('SM fetchTransactionsFromBackground: найдено строк в таблице', rows.length);
             let newTransactions = [];
             const allowedOps = ['Скачивание файла', 'Платное скачивание файла'];
 
@@ -134,10 +151,14 @@ function fetchTransactionsFromBackground() {
                 }
             });
 
+            console.log('SM fetchTransactionsFromBackground: найдено новых транзакций на странице', newTransactions.length);
+
             // Сравниваем с сохранёнными
             chrome.storage.local.get(['sm_all_stats'], function(result) {
                 const cached = result.sm_all_stats || [];
+                console.log('SM fetchTransactionsFromBackground: в кэше', cached.length, 'транзакций');
                 const reallyNew = newTransactions.filter(t => !cached.find(x => x.id === t.id));
+                console.log('SM fetchTransactionsFromBackground: действительно новых', reallyNew.length);
                 if (reallyNew.length > 0) {
                     // Сохраняем обновлённый список
                     const combined = [...cached, ...reallyNew];
@@ -150,7 +171,7 @@ function fetchTransactionsFromBackground() {
                 }
             });
         })
-        .catch(() => {});
+        .catch(err => console.log('SM fetchTransactionsFromBackground: ОШИБКА', err));
 }
 
 // Обработчик изменения курса
