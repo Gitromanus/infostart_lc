@@ -280,14 +280,13 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                     rate_threshold: parseFloat(document.getElementById('sm-rate-threshold').value) || 5,
                     show_prediction: document.getElementById('sm-show-prediction').checked
                 };
-                chrome.storage.local.set({ sm_settings: settings }, function() {
-                    settingsModal.style.display = 'none';
-                });
+                chrome.storage.local.set({ sm_settings: settings }).catch(() => {});
                 // Применяем видимость прогноза
                 const predBox = document.getElementById('sm-prediction-box');
                 if (predBox) {
                     predBox.style.display = settings.show_prediction ? 'block' : 'none';
                 }
+                settingsModal.style.display = 'none';
             };
         };
 
