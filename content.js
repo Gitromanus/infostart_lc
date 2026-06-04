@@ -61,7 +61,8 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                     currentRate = newRate;
                     console.log('SM content.js курс обновлен:', currentRate);
                     // Уведомление в background об изменении курса
-                    chrome.runtime.sendMessage({ type: 'RATE_UPDATED', rate: newRate }).catch(() => {});
+                    console.log('SM content.js отправляю RATE_UPDATED:', newRate);
+                    chrome.runtime.sendMessage({ type: 'RATE_UPDATED', rate: newRate }).catch(err => console.log('SM content.js ошибка отправки RATE_UPDATED:', err));
                     // Обновляем дашборд через storage — так renderInfo подхватит новый курс
                     chrome.storage.local.get(['sm_all_stats'], function(r) {
                         const stats = r.sm_all_stats || cachedStats;

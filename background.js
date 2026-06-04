@@ -41,11 +41,14 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 // Слушаем сообщения от content.js
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    console.log('SM background onMessage: получено сообщение', message.type, message);
     switch (message.type) {
         case 'RATE_UPDATED':
+            console.log('SM background onMessage: вызываю handleRateUpdate с курсом', message.rate);
             handleRateUpdate(message.rate);
             break;
         case 'NEW_TRANSACTIONS':
+            console.log('SM background onMessage: вызываю handleNewTransactions, транзакций:', message.transactions ? message.transactions.length : 0);
             handleNewTransactions(message.transactions, message.rate);
             break;
     }
