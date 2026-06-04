@@ -86,6 +86,7 @@ function showNotification(title, message) {
     const id = `sm-notify-${++notificationId}`;
     chrome.notifications.create(id, {
         type: 'basic',
+        iconUrl: 'icon48.png',
         title: title,
         message: message,
         priority: 2
