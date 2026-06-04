@@ -86,7 +86,6 @@ function showNotification(title, message) {
     const id = `sm-notify-${++notificationId}`;
     chrome.notifications.create(id, {
         type: 'basic',
-        iconUrl: 'logois.svg',
         title: title,
         message: message,
         priority: 2
