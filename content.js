@@ -1,9 +1,39 @@
 chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
     let currentRate = result.sm_rate || 170;
     let cachedStats = result.sm_all_stats || [];
-    let currentView = 'month'; 
+    let currentView = 'month';
     
     const isTransact = window.location.href.includes('transact');
+
+    // Список разрешённых типов операций для учёта
+    const ALLOWED_OPERATIONS = [
+        'Скачивание файла',
+        'Платное скачивание файла'
+    ];
+
+    // Проверяет, относится ли строка таблицы к разрешённому типу операции
+    const isAllowedOperation = (cells) => {
+        if (cells.length < 4) return false;
+        const desc = cells[3].innerText.trim();
+        return ALLOWED_OPERATIONS.some(op => desc.startsWith(op));
+    };
+
+    // Пробует декодировать ArrayBuffer в строку, определяя кодировку
+    const decodeResponse = (buf) => {
+        // Сначала пробуем windows-1251
+        try {
+            const text = new TextDecoder('windows-1251').decode(buf);
+            // Проверяем, есть ли в тексте узнаваемые русские слова из операций
+            if (text.includes('Скачивание') || text.includes('Платное') || text.includes('$m')) {
+                return text;
+            }
+        } catch (e) {}
+        // Если не нашли — пробуем UTF-8
+        try {
+            return new TextDecoder('utf-8').decode(buf);
+        } catch (e) {}
+        return new TextDecoder('windows-1251').decode(buf);
+    };
 
     // 1. ОБНОВЛЕНИЕ КУРСА С БИРЖИ
     // Фоновый fetch курса — срабатывает при каждом открытии любой страницы расширения
@@ -15,7 +45,7 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                 return resp.arrayBuffer();
             })
             .then(buf => {
-                const html = new TextDecoder('windows-1251').decode(buf);
+                const html = decodeResponse(buf);
                 // Курс в <span class="exh-buy-row">157</span> после текста "Текущий:"
                 // Ищем курс regex прямо в HTML: <span class="exh-buy-row">157</span>
                 const rateMatch = html.match(/<span class=["']exh-sale-row["']>\s*([\d,.]+)\s*<\/span>/);
@@ -48,6 +78,8 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                             document.querySelectorAll('.sm-done').forEach(el => el.remove());
                             document.querySelectorAll('tr').forEach(row => {
                                 const cells = row.querySelectorAll('td');
+                                // Показываем рублёвые суммы только для разрешённых операций
+                                if (!isAllowedOperation(cells)) return;
                                 [1, 2].forEach(idx => {
                                     const cell = cells[idx];
                                     if (!cell) return;
@@ -211,6 +243,8 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
         const updateTable = () => {
             document.querySelectorAll('tr').forEach(row => {
                 const cells = row.querySelectorAll('td');
+                // Показываем рублёвые суммы только для разрешённых операций
+                if (!isAllowedOperation(cells)) return;
                 // Обрабатываем только 2-ю и 3-ю колонки (приход/расход $m), не баланс
                 [1, 2].forEach(idx => {
                     const cell = cells[idx];
@@ -235,9 +269,9 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
             let found = [];
             doc.querySelectorAll('tr').forEach(row => {
                 const cells = row.querySelectorAll('td');
-                if (cells.length >= 2) {
+                if (cells.length >= 4) {
                     const txt = cells[1].innerText;
-                    if (txt.includes('$m') && !txt.includes('-')) {
+                    if (txt.includes('$m') && !txt.includes('-') && isAllowedOperation(cells)) {
                         const val = parseFloat(txt.split('$')[0].replace(',', '.').replace(/[^\d.]/g, ''));
                         const fullDate = cells[0].innerText.trim();
                         if (!isNaN(val)) found.push({ id: fullDate + '_' + val, date: fullDate.split(' ')[0], sm: val });
@@ -427,7 +461,8 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                     url.searchParams.set('PAGEN_1', i);
                     const resp = await fetch(url.toString());
                     const buf = await resp.arrayBuffer();
-                    const doc = new DOMParser().parseFromString(new TextDecoder('windows-1251').decode(buf), 'text/html');
+                    const html = decodeResponse(buf);
+                    const doc = new DOMParser().parseFromString(html, 'text/html');
                     parseRows(doc).forEach(r => {
                         if (!results.find(x => x.id === r.id)) results.push(r);
                     });
