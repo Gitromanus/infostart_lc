@@ -91,7 +91,7 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                                         if (!isNaN(val)) {
                                             const d = document.createElement('div');
                                             d.className = 'sm-done';
-                                            d.style.cssText = 'color:#d32f2f; font-weight:bold; font-size:0.85em; margin-top:2px;';
+                                            d.style.cssText = 'color:#1976d2; font-weight:bold; font-size:0.85em; margin-top:2px;';
                                             d.innerText = `(${(val * newRate).toLocaleString('ru-RU', {minimumFractionDigits:2, maximumFractionDigits:2})} ₽)`;
                                             cell.appendChild(d);
                                         }
@@ -129,20 +129,20 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                     <div style="flex: 1; min-width: 140px; background:#fff; padding:10px; border-radius:6px; border:1px solid #eee;">
                         <div style="font-size:11px; color:#888;">ЗА СЕГОДНЯ (Курс: ${currentRate})</div>
                         <div id="sm-val-day" style="font-size:18px; font-weight:bold; color:#28a745;">0.00 $m</div>
-                        <div id="sm-val-day-rub" style="color:#d32f2f; font-size:14px; font-weight:bold;">0.00 ₽</div>
+                        <div id="sm-val-day-rub" style="color:#1976d2; font-size:14px; font-weight:bold;">0.00 ₽</div>
                     </div>
                     <div style="flex: 1; min-width: 140px; background:#fff; padding:10px; border-radius:6px; border:1px solid #eee;">
                         <div style="font-size:11px; color:#888;">МЕСЯЦ</div>
                         <div id="sm-val-month" style="font-size:18px; font-weight:bold; color:#28a745;">0.00 $m</div>
-                        <div id="sm-val-month-rub" style="color:#d32f2f; font-size:14px; font-weight:bold;">0.00 ₽</div>
+                        <div id="sm-val-month-rub" style="color:#1976d2; font-size:14px; font-weight:bold;">0.00 ₽</div>
                     </div>
                     <div style="flex: 1; min-width: 140px; background:#fff; padding:10px; border-radius:6px; border:1px solid #eee;">
                         <div style="font-size:11px; color:#888;">ОБЩИЙ ИТОГ</div>
                         <div id="sm-val-total" style="font-size:18px; font-weight:bold; color:#28a745;">0.00 $m</div>
-                        <div id="sm-val-total-rub" style="color:#d32f2f; font-size:14px; font-weight:bold;">0.00 ₽</div>
+                        <div id="sm-val-total-rub" style="color:#1976d2; font-size:14px; font-weight:bold;">0.00 ₽</div>
                     </div>
-                    <div style="display:flex; align-items:center; justify-content:center; min-width:50px;">
-                        <div style="cursor:pointer; font-size:24px; background:#e8e8e8; border-radius:6px; padding:6px 8px; transition:background 0.2s, transform 0.2s; line-height:1;" id="sm-settings-btn" title="Настройки">⚙️</div>
+                    <div style="display:flex; align-items:stretch; min-width:50px;">
+                        <div style="cursor:pointer; font-size:24px; background:#e8e8e8; border-radius:6px; padding:20px 8px; transition:background 0.2s, transform 0.2s; line-height:1; display:flex; align-items:center;" id="sm-settings-btn" title="Настройки">⚙️</div>
                     </div>
                 </div>
                 
@@ -367,7 +367,7 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                         if (!isNaN(val)) {
                             const d = document.createElement('div');
                             d.className = 'sm-done';
-                            d.style.cssText = 'color:#d32f2f; font-weight:bold; font-size:0.85em; margin-top:2px;';
+                            d.style.cssText = 'color:#1976d2; font-weight:bold; font-size:0.85em; margin-top:2px;';
                             d.innerText = `(${(val * currentRate).toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2})} ₽)`;
                             cell.appendChild(d);
                         }
