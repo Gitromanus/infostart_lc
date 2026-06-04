@@ -161,7 +161,7 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats', 'sm_dark_theme'], function(
 
                 <div style="display:flex; align-items:center; gap:10px;">
                     <input type="number" id="sm-pages-input" value="10" style="width:50px; padding:3px;">
-                    <button id="sm-load-btn" style="cursor:pointer; padding:6px 12px; background:#007bff; color:#fff; border:none; border-radius:4px;">Догрузить историю</button>
+                    <button id="sm-load-btn" style="cursor:pointer; padding:6px 12px; background:#007bff; color:#fff; border:none; border-radius:4px;">Загрузить историю</button>
                     <button id="sm-theme-toggle" title="${themeBtnTitle}" style="cursor:pointer; padding:6px 12px; border:1px solid #ddd; background:#f8f9fa; border-radius:4px; margin-left:auto;">${themeBtnLabel}</button>
                     <span id="sm-status" style="font-size:12px; color:#999;"></span>
                 </div>
