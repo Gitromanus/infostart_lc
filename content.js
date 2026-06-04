@@ -198,7 +198,7 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                                 </label>
                                 <div style="display:flex; align-items:center; gap:6px;">
                                     <span style="font-size:11px; color:#666; white-space:nowrap;">Порог:</span>
-                                    <input type="number" id="sm-rate-threshold" value="5" min="1" max="50" style="width:50px; padding:3px; border:1px solid #ccc; border-radius:4px; font-size:12px;">
+                                    <input type="number" id="sm-rate-threshold" value="5" min="0.01" max="50" step="0.01" style="width:60px; padding:3px; border:1px solid #ccc; border-radius:4px; font-size:12px;">
                                     <span style="font-size:11px; color:#666;">%</span>
                                 </div>
                             </div>
@@ -277,7 +277,7 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                     notify_rate_up: document.getElementById('sm-notify-rate-up').checked,
                     notify_rate_down: document.getElementById('sm-notify-rate-down').checked,
                     notify_downloads: document.getElementById('sm-notify-downloads').checked,
-                    rate_threshold: parseInt(document.getElementById('sm-rate-threshold').value) || 5,
+                    rate_threshold: parseFloat(document.getElementById('sm-rate-threshold').value) || 5,
                     show_prediction: document.getElementById('sm-show-prediction').checked
                 };
                 chrome.storage.local.set({ sm_settings: settings }, function() {
