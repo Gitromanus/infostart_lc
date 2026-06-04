@@ -118,9 +118,10 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
 
             const dash = document.createElement('div');
             dash.id = 'sm-dashboard';
-            dash.style.cssText = "background:#f8f9fa; border:1px solid #ddd; border-radius:8px; padding:15px; margin-bottom:20px; font-family:sans-serif; color:#333; position:relative;";
+            dash.style.cssText = "background:#f8f9fa; border:1px solid #ddd; border-radius:8px; padding:15px; margin-bottom:20px; font-family:sans-serif; color:#333;";
             
             dash.innerHTML = `
+                <!-- Шапка с блоками статистики и кнопкой настроек -->
                 <div style="display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 15px;">
                     <div style="flex: 1; min-width: 140px; background:#fff; padding:10px; border-radius:6px; border:1px solid #eee;">
                         <div style="font-size:11px; color:#888;">ЗА СЕГОДНЯ (Курс: ${currentRate})</div>
@@ -137,9 +138,12 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                         <div id="sm-val-total" style="font-size:18px; font-weight:bold; color:#28a745;">0.00 $m</div>
                         <div id="sm-val-total-rub" style="color:#d32f2f; font-size:14px; font-weight:bold;">0.00 ₽</div>
                     </div>
-                    <div style="position:absolute; top:10px; right:10px; cursor:pointer; font-size:20px; opacity:0.5;" id="sm-settings-btn" title="Настройки уведомлений">⚙️</div>
+                    <div style="display:flex; align-items:center; justify-content:center; min-width:50px;">
+                        <div style="cursor:pointer; font-size:22px; opacity:0.5; transition:opacity 0.2s;" id="sm-settings-btn" title="Настройки">⚙️</div>
+                    </div>
                 </div>
                 
+                <!-- График -->
                 <div id="sm-chart-box" style="display:none; background:#fff; padding:15px; border:1px solid #eee; border-radius:6px; margin-bottom:15px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                         <div style="font-size:12px; font-weight:bold; color:#666;">ГРАФИК ДОХОДА (₽)</div>
@@ -152,44 +156,69 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                     <div id="sm-canvas" style="width:100%; height:150px; position:relative;"></div>
                 </div>
 
+                <!-- Прогноз -->
                 <div id="sm-prediction-box" style="background:#fff; padding:15px; border:1px solid #eee; border-radius:6px; margin-bottom:15px;">
                     <div style="font-size:11px; color:#999; text-align:center;">Загрузка прогноза...</div>
                 </div>
 
-                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-                    <input type="number" id="sm-pages-input" value="10" style="width:50px; padding:3px;">
-                    <button id="sm-load-btn" style="cursor:pointer; padding:6px 12px; background:#007bff; color:#fff; border:none; border-radius:4px;">Догрузить историю</button>
-                    <span id="sm-status" style="font-size:12px; color:#999;"></span>
-                    <button id="sm-test-notify" style="cursor:pointer; padding:6px 12px; background:#ff9800; color:#fff; border:none; border-radius:4px;">🔔 Тест уведомлений</button>
-                </div>
-
                 <!-- Модальное окно настроек -->
                 <div id="sm-settings-modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.4); z-index:9999; justify-content:center; align-items:center;">
-                    <div style="background:#fff; border-radius:10px; padding:25px; max-width:380px; width:90%; box-shadow:0 4px 20px rgba(0,0,0,0.2); font-size:14px;">
-                        <div style="font-size:16px; font-weight:bold; margin-bottom:15px; color:#333;">⚙️ Настройки уведомлений</div>
+                    <div style="background:#fff; border-radius:10px; padding:25px; max-width:400px; width:90%; box-shadow:0 4px 20px rgba(0,0,0,0.2); font-size:14px; max-height:90vh; overflow-y:auto;">
+                        <div style="font-size:16px; font-weight:bold; margin-bottom:15px; color:#333;">⚙️ Настройки</div>
                         
-                        <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px; cursor:pointer;">
-                            <input type="checkbox" id="sm-notify-rate-up" checked>
-                            <span>🟢 Уведомлять о повышении курса</span>
-                        </label>
-                        
-                        <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px; cursor:pointer;">
-                            <input type="checkbox" id="sm-notify-rate-down" checked>
-                            <span>🔴 Уведомлять о понижении курса</span>
-                        </label>
-                        
-                        <label style="display:flex; align-items:center; gap:8px; margin-bottom:15px; cursor:pointer;">
-                            <input type="checkbox" id="sm-notify-downloads" checked>
-                            <span>💰 Уведомлять о скачиваниях</span>
-                        </label>
-                        
+                        <!-- Блок: Уведомления -->
                         <div style="margin-bottom:15px;">
-                            <div style="font-size:12px; color:#666; margin-bottom:4px;">Порог изменения курса (%):</div>
-                            <input type="number" id="sm-rate-threshold" value="5" min="1" max="50" style="width:70px; padding:4px; border:1px solid #ccc; border-radius:4px;">
+                            <div style="font-size:12px; font-weight:bold; color:#666; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px; padding-bottom:4px; border-bottom:1px solid #eee;">🔔 Уведомления</div>
+                            
+                            <label style="display:flex; align-items:center; gap:8px; margin-bottom:8px; cursor:pointer;">
+                                <input type="checkbox" id="sm-notify-rate-up" checked>
+                                <span>🟢 О повышении курса</span>
+                            </label>
+                            
+                            <label style="display:flex; align-items:center; gap:8px; margin-bottom:8px; cursor:pointer;">
+                                <input type="checkbox" id="sm-notify-rate-down" checked>
+                                <span>🔴 О понижении курса</span>
+                            </label>
+                            
+                            <label style="display:flex; align-items:center; gap:8px; margin-bottom:8px; cursor:pointer;">
+                                <input type="checkbox" id="sm-notify-downloads" checked>
+                                <span>💰 О скачиваниях</span>
+                            </label>
+                            
+                            <div style="margin-top:8px;">
+                                <div style="font-size:12px; color:#666; margin-bottom:4px;">Порог изменения курса (%):</div>
+                                <input type="number" id="sm-rate-threshold" value="5" min="1" max="50" style="width:70px; padding:4px; border:1px solid #ccc; border-radius:4px;">
+                            </div>
+                            
+                            <div style="margin-top:10px;">
+                                <button id="sm-test-notify" style="cursor:pointer; padding:5px 10px; background:#ff9800; color:#fff; border:none; border-radius:4px; font-size:12px;">🔔 Проверить уведомления</button>
+                            </div>
                         </div>
                         
-                        <div style="display:flex; gap:8px; justify-content:flex-end;">
-                            <button id="sm-settings-close" style="cursor:pointer; padding:6px 14px; background:#eee; color:#333; border:none; border-radius:4px;">Отмена</button>
+                        <!-- Блок: История -->
+                        <div style="margin-bottom:15px;">
+                            <div style="font-size:12px; font-weight:bold; color:#666; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px; padding-bottom:4px; border-bottom:1px solid #eee;">📊 История</div>
+                            
+                            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                                <span style="font-size:12px; color:#666;">Страниц:</span>
+                                <input type="number" id="sm-pages-input" value="10" min="1" max="100" style="width:55px; padding:4px; border:1px solid #ccc; border-radius:4px;">
+                                <button id="sm-load-btn" style="cursor:pointer; padding:5px 10px; background:#007bff; color:#fff; border:none; border-radius:4px; font-size:12px;">📥 Догрузить</button>
+                                <span id="sm-status" style="font-size:11px; color:#999;"></span>
+                            </div>
+                        </div>
+                        
+                        <!-- Блок: Отображение -->
+                        <div style="margin-bottom:15px;">
+                            <div style="font-size:12px; font-weight:bold; color:#666; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px; padding-bottom:4px; border-bottom:1px solid #eee;">👁️ Отображение</div>
+                            
+                            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                                <input type="checkbox" id="sm-show-prediction" checked>
+                                <span>Показывать прогноз дохода</span>
+                            </label>
+                        </div>
+                        
+                        <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:5px;">
+                            <button id="sm-settings-close" style="cursor:pointer; padding:6px 14px; background:#eee; color:#333; border:none; border-radius:4px;">Закрыть</button>
                             <button id="sm-settings-save" style="cursor:pointer; padding:6px 14px; background:#007bff; color:#fff; border:none; border-radius:4px;">Сохранить</button>
                         </div>
                     </div>
@@ -221,6 +250,12 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                 document.getElementById('sm-notify-rate-down').checked = s.notify_rate_down !== false;
                 document.getElementById('sm-notify-downloads').checked = s.notify_downloads !== false;
                 document.getElementById('sm-rate-threshold').value = s.rate_threshold || 5;
+                document.getElementById('sm-show-prediction').checked = s.show_prediction !== false;
+                // Применяем видимость прогноза
+                const predBox = document.getElementById('sm-prediction-box');
+                if (predBox) {
+                    predBox.style.display = s.show_prediction !== false ? 'block' : 'none';
+                }
             });
 
             settingsBtn.onclick = () => { settingsModal.style.display = 'flex'; };
@@ -231,11 +266,17 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                     notify_rate_up: document.getElementById('sm-notify-rate-up').checked,
                     notify_rate_down: document.getElementById('sm-notify-rate-down').checked,
                     notify_downloads: document.getElementById('sm-notify-downloads').checked,
-                    rate_threshold: parseInt(document.getElementById('sm-rate-threshold').value) || 5
+                    rate_threshold: parseInt(document.getElementById('sm-rate-threshold').value) || 5,
+                    show_prediction: document.getElementById('sm-show-prediction').checked
                 };
                 chrome.storage.local.set({ sm_settings: settings }, function() {
                     settingsModal.style.display = 'none';
                 });
+                // Применяем видимость прогноза
+                const predBox = document.getElementById('sm-prediction-box');
+                if (predBox) {
+                    predBox.style.display = settings.show_prediction ? 'block' : 'none';
+                }
             };
         };
 
@@ -380,128 +421,121 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
         const drawPrediction = (data) => {
             const container = document.getElementById('sm-prediction-box');
             if (!container) return;
-            
-            if (data.length < 5) {
-                container.innerHTML = '<div style="font-size:11px; color:#999; text-align:center;">Недостаточно данных для прогноза</div>';
-                return;
-            }
 
-            const now = new Date();
-            const currentMonth = now.getMonth() + 1;
-            const currentYear = now.getFullYear();
-            const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
-            const today = now.getDate();
-            const daysPassed = today;
-            const daysRemaining = daysInMonth - today;
-
-            // Группируем данные по месяцам для анализа истории
-            const monthlyData = {};
-            data.forEach(e => {
-                const [d, m, y] = e.date.split('.');
-                const key = `${m}.${y}`;
-                if (!monthlyData[key]) monthlyData[key] = 0;
-                monthlyData[key] += e.sm * currentRate;
-            });
-
-            // Считаем доход за текущий месяц
-            let currentMonthTotal = 0;
-            const currentMonthKey = `${currentMonth}.${currentYear}`;
-            data.forEach(e => {
-                const [d, m, y] = e.date.split('.');
-                if (parseInt(m) === currentMonth && parseInt(y) === currentYear) {
-                    currentMonthTotal += e.sm * currentRate;
+            // Проверяем настройку показа прогноза и отрисовываем внутри коллбэка
+            chrome.storage.local.get(['sm_settings'], function(result) {
+                const s = result.sm_settings || {};
+                if (s.show_prediction === false) {
+                    container.style.display = 'none';
+                    return;
                 }
-            });
+                container.style.display = 'block';
 
-            // Считаем средний дневной доход в текущем месяце
-            const dailyAvgCurrent = daysPassed > 0 ? currentMonthTotal / daysPassed : 0;
-
-            // Анализируем аналогичные месяцы (те же номера месяцев в прошлые годы)
-            const similarMonths = [];
-            Object.entries(monthlyData).forEach(([key, value]) => {
-                const [m, y] = key.split('.').map(Number);
-                if (m === currentMonth && (y !== currentYear || daysPassed >= daysInMonth)) {
-                    // Если это тот же месяц но прошлого года, учитываем только если прошло достаточно дней
-                    const monthDays = new Date(y, m, 0).getDate();
-                    const avgDaily = value / monthDays;
-                    similarMonths.push({ year: y, total: value, avgDaily });
+                if (data.length < 5) {
+                    container.innerHTML = '<div style="font-size:11px; color:#999; text-align:center;">Недостаточно данных для прогноза</div>';
+                    return;
                 }
+
+                const now = new Date();
+                const currentMonth = now.getMonth() + 1;
+                const currentYear = now.getFullYear();
+                const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+                const today = now.getDate();
+                const daysPassed = today;
+                const daysRemaining = daysInMonth - today;
+
+                // Группируем данные по месяцам для анализа истории
+                const monthlyData = {};
+                data.forEach(e => {
+                    const [d, m, y] = e.date.split('.');
+                    const key = `${m}.${y}`;
+                    if (!monthlyData[key]) monthlyData[key] = 0;
+                    monthlyData[key] += e.sm * currentRate;
+                });
+
+                // Считаем доход за текущий месяц
+                let currentMonthTotal = 0;
+                data.forEach(e => {
+                    const [d, m, y] = e.date.split('.');
+                    if (parseInt(m) === currentMonth && parseInt(y) === currentYear) {
+                        currentMonthTotal += e.sm * currentRate;
+                    }
+                });
+
+                // Считаем средний дневной доход в текущем месяце
+                const dailyAvgCurrent = daysPassed > 0 ? currentMonthTotal / daysPassed : 0;
+
+                // Анализируем аналогичные месяцы (те же номера месяцев в прошлые годы)
+                const similarMonths = [];
+                Object.entries(monthlyData).forEach(([key, value]) => {
+                    const [m, y] = key.split('.').map(Number);
+                    if (m === currentMonth && (y !== currentYear || daysPassed >= daysInMonth)) {
+                        const monthDays = new Date(y, m, 0).getDate();
+                        const avgDaily = value / monthDays;
+                        similarMonths.push({ year: y, total: value, avgDaily });
+                    }
+                });
+
+                // Рассчитываем прогноз несколькими методами и берём средневзвешенное значение
+                const method1_currentTrend = currentMonthTotal + (dailyAvgCurrent * daysRemaining);
+                let method2_historicalAvg = null;
+                if (similarMonths.length > 0) {
+                    const avgHistoricalDaily = similarMonths.reduce((sum, m) => sum + m.avgDaily, 0) / similarMonths.length;
+                    method2_historicalAvg = currentMonthTotal + (avgHistoricalDaily * daysRemaining);
+                }
+                const method3_proportional = daysPassed > 0 ? (currentMonthTotal / daysPassed) * daysInMonth : 0;
+
+                let predictedEndOfMonth;
+                let predictionMethod;
+                let confidence = 'средняя';
+                let confidenceColor = '#ff9800';
+
+                if (similarMonths.length >= 2 && method2_historicalAvg !== null) {
+                    const weightCurrent = 0.4;
+                    const weightHistorical = 0.6;
+                    predictedEndOfMonth = (method1_currentTrend * weightCurrent) + (method2_historicalAvg * weightHistorical);
+                    predictionMethod = 'на основе текущего месяца и истории';
+                    confidence = 'высокая';
+                    confidenceColor = '#28a745';
+                } else if (daysPassed >= 5) {
+                    predictedEndOfMonth = method1_currentTrend;
+                    predictionMethod = 'на основе динамики текущего месяца';
+                } else {
+                    predictedEndOfMonth = method3_proportional;
+                    predictionMethod = 'предварительный (мало данных)';
+                    confidence = 'низкая';
+                    confidenceColor = '#f44336';
+                }
+
+                predictedEndOfMonth = Math.max(0, predictedEndOfMonth);
+
+                const trendIcon = predictedEndOfMonth > currentMonthTotal ? '↗' : predictedEndOfMonth < currentMonthTotal ? '↘' : '→';
+                const additionalIncome = Math.max(0, predictedEndOfMonth - currentMonthTotal);
+
+                container.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                        <div style="font-size:12px; font-weight:bold; color:#666;">🤖 ПРОГНОЗ ДО КОНЦА МЕСЯЦА ${trendIcon}</div>
+                        <div style="font-size:9px; color:${confidenceColor};">Достоверность: ${confidence}</div>
+                    </div>
+                    <div style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding:12px; border-radius:6px; text-align:center; margin-bottom:8px;">
+                        <div style="font-size:10px; color:rgba(255,255,255,0.9);">Ожидаемый итог за ${currentMonth}.${currentYear}</div>
+                        <div style="font-size:20px; font-weight:bold; color:#fff; margin-top:4px;">${predictedEndOfMonth.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₽</div>
+                    </div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+                        <div style="background:#f8f9fa; padding:8px; border-radius:4px; text-align:center;">
+                            <div style="font-size:9px; color:#666;">УЖЕ ЗАРАБОТАНО</div>
+                            <div style="font-size:13px; font-weight:bold; color:#28a745;">${currentMonthTotal.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₽</div>
+                        </div>
+                        <div style="background:#f8f9fa; padding:8px; border-radius:4px; text-align:center;">
+                            <div style="font-size:9px; color:#666;">ОЖИДАЕТСЯ (${daysRemaining} дн.)</div>
+                            <div style="font-size:13px; font-weight:bold; color:#1976d2;">+${additionalIncome.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₽</div>
+                        </div>
+                    </div>
+                    <div style="margin-top:6px; font-size:9px; color:#999; text-align:center;">
+                        *Прогноз ${predictionMethod}${similarMonths.length > 0 ? ` (учтено ${similarMonths.length} похожих мес.)` : ''}
+                    </div>
+                `;
             });
-
-            // Рассчитываем прогноз несколькими методами и берём средневзвешенное значение
-            
-            // Метод 1: Экстраполяция текущего месяца
-            const method1_currentTrend = currentMonthTotal + (dailyAvgCurrent * daysRemaining);
-            
-            // Метод 2: На основе средней динамики похожих месяцев
-            let method2_historicalAvg = null;
-            if (similarMonths.length > 0) {
-                const avgHistoricalDaily = similarMonths.reduce((sum, m) => sum + m.avgDaily, 0) / similarMonths.length;
-                method2_historicalAvg = currentMonthTotal + (avgHistoricalDaily * daysRemaining);
-            }
-            
-            // Метод 3: Простое масштабирование (пропорция дней)
-            const method3_proportional = daysPassed > 0 ? (currentMonthTotal / daysPassed) * daysInMonth : 0;
-
-            // Выбираем метод или комбинируем
-            let predictedEndOfMonth;
-            let predictionMethod;
-            let confidence = 'средняя';
-            let confidenceColor = '#ff9800';
-
-            if (similarMonths.length >= 2 && method2_historicalAvg !== null) {
-                // Если есть история похожих месяцев, используем взвешенное среднее
-                const weightCurrent = 0.4;
-                const weightHistorical = 0.6;
-                predictedEndOfMonth = (method1_currentTrend * weightCurrent) + (method2_historicalAvg * weightHistorical);
-                predictionMethod = 'на основе текущего месяца и истории';
-                confidence = 'высокая';
-                confidenceColor = '#28a745';
-            } else if (daysPassed >= 5) {
-                // Если прошло достаточно дней в месяце, используем тренд текущего месяца
-                predictedEndOfMonth = method1_currentTrend;
-                predictionMethod = 'на основе динамики текущего месяца';
-            } else {
-                // Мало данных - используем пропорциональный метод
-                predictedEndOfMonth = method3_proportional;
-                predictionMethod = 'предварительный (мало данных)';
-                confidence = 'низкая';
-                confidenceColor = '#f44336';
-            }
-
-            predictedEndOfMonth = Math.max(0, predictedEndOfMonth);
-
-            // Определяем тренд
-            const trendIcon = predictedEndOfMonth > currentMonthTotal ? '↗' : predictedEndOfMonth < currentMonthTotal ? '↘' : '→';
-            const trendText = predictedEndOfMonth > currentMonthTotal ? 'рост' : predictedEndOfMonth < currentMonthTotal ? 'снижение' : 'стабильно';
-            const trendColor = predictedEndOfMonth > currentMonthTotal ? '#28a745' : predictedEndOfMonth < currentMonthTotal ? '#d32f2f' : '#999';
-
-            // Прогнозируемый дополнительный доход до конца месяца
-            const additionalIncome = Math.max(0, predictedEndOfMonth - currentMonthTotal);
-
-            container.innerHTML = `
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                    <div style="font-size:12px; font-weight:bold; color:#666;">🤖 ПРОГНОЗ ДО КОНЦА МЕСЯЦА ${trendIcon}</div>
-                    <div style="font-size:9px; color:${confidenceColor};">Достоверность: ${confidence}</div>
-                </div>
-                <div style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding:12px; border-radius:6px; text-align:center; margin-bottom:8px;">
-                    <div style="font-size:10px; color:rgba(255,255,255,0.9);">Ожидаемый итог за ${currentMonth}.${currentYear}</div>
-                    <div style="font-size:20px; font-weight:bold; color:#fff; margin-top:4px;">${predictedEndOfMonth.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₽</div>
-                </div>
-                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
-                    <div style="background:#f8f9fa; padding:8px; border-radius:4px; text-align:center;">
-                        <div style="font-size:9px; color:#666;">УЖЕ ЗАРАБОТАНО</div>
-                        <div style="font-size:13px; font-weight:bold; color:#28a745;">${currentMonthTotal.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₽</div>
-                    </div>
-                    <div style="background:#f8f9fa; padding:8px; border-radius:4px; text-align:center;">
-                        <div style="font-size:9px; color:#666;">ОЖИДАЕТСЯ (${daysRemaining} дн.)</div>
-                        <div style="font-size:13px; font-weight:bold; color:#1976d2;">+${additionalIncome.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₽</div>
-                    </div>
-                </div>
-                <div style="margin-top:6px; font-size:9px; color:#999; text-align:center;">
-                    *Прогноз ${predictionMethod}${similarMonths.length > 0 ? ` (учтено ${similarMonths.length} похожих мес.)` : ''}
-                </div>
-            `;
         };
 
         const autoSync = () => {
