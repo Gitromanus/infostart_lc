@@ -1,4 +1,5 @@
 // Service Worker для уведомлений расширения "Инфостарт Курс SM"
+// Работает в фоне Chrome, проверяет курс и транзакции по расписанию
 
 let previousRate = null;
 let notificationId = 0;
@@ -18,6 +19,23 @@ chrome.storage.local.get(['sm_rate', 'sm_settings'], function(result) {
     chrome.storage.local.set({ sm_settings: settings });
 });
 
+// Создаём будильники при установке/обновлении расширения
+chrome.runtime.onInstalled.addListener(() => {
+    // Проверка курса каждые 30 минут
+    chrome.alarms.create('sm-check-rate', { periodInMinutes: 30 });
+    // Проверка транзакций каждый час
+    chrome.alarms.create('sm-check-transactions', { periodInMinutes: 60 });
+});
+
+// Обработчик будильников
+chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === 'sm-check-rate') {
+        fetchRateFromBackground();
+    } else if (alarm.name === 'sm-check-transactions') {
+        fetchTransactionsFromBackground();
+    }
+});
+
 // Слушаем сообщения от content.js
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     switch (message.type) {
@@ -30,11 +48,106 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 });
 
-// Получить настройки (синхронно из кэша)
+// Получить настройки
 function getSettings(callback) {
     chrome.storage.local.get(['sm_settings'], function(result) {
         callback({ ...DEFAULT_SETTINGS, ...(result.sm_settings || {}) });
     });
+}
+
+// Пробует декодировать ArrayBuffer в строку, определяя кодировку
+function decodeResponse(buf) {
+    try {
+        const text = new TextDecoder('windows-1251').decode(buf);
+        if (text.includes('Скачивание') || text.includes('Платное') || text.includes('$m')) {
+            return text;
+        }
+    } catch (e) {}
+    try {
+        return new TextDecoder('utf-8').decode(buf);
+    } catch (e) {}
+    return new TextDecoder('windows-1251').decode(buf);
+}
+
+// Фоновый запрос курса с биржи
+function fetchRateFromBackground() {
+    fetch('https://infostart.ru/profile/money/stockexchange/', { credentials: 'include' })
+        .then(resp => resp.arrayBuffer())
+        .then(buf => {
+            const html = decodeResponse(buf);
+            const rateMatch = html.match(/<span class=["']exh-sale-row["']>\s*([\d,.]+)\s*<\/span>/);
+            const newRate = rateMatch ? parseFloat(rateMatch[1].replace(',', '.')) : NaN;
+            if (!isNaN(newRate) && newRate > 0 && newRate < 100000) {
+                chrome.storage.local.set({ 'sm_rate': newRate });
+                handleRateUpdate(newRate);
+            }
+        })
+        .catch(() => {});
+}
+
+// Фоновый запрос транзакций
+function fetchTransactionsFromBackground() {
+    fetch('https://infostart.ru/profile/money/transact/', { credentials: 'include' })
+        .then(resp => resp.arrayBuffer())
+        .then(buf => {
+            const html = decodeResponse(buf);
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const rows = doc.querySelectorAll('tr');
+            let newTransactions = [];
+            const allowedOps = ['Скачивание файла', 'Платное скачивание файла'];
+
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                if (cells.length < 4) return;
+                const desc = cells[3].innerText.trim();
+                if (!allowedOps.some(op => desc.startsWith(op))) return;
+
+                // Парсим сумму $m из ячеек 1 и 2
+                let sm = 0;
+                [1, 2].forEach(idx => {
+                    const cell = cells[idx];
+                    if (!cell) return;
+                    const text = cell.innerText.trim();
+                    if (/^[\d.,]+\s*\$m/.test(text)) {
+                        sm += parseFloat(text.split('$')[0].replace(',', '.').replace(/[^\d.]/g, ''));
+                    }
+                });
+
+                if (sm > 0) {
+                    // Извлекаем ID транзакции
+                    const links = row.querySelectorAll('a');
+                    let id = '';
+                    links.forEach(a => {
+                        const href = a.getAttribute('href') || '';
+                        const m = href.match(/ID=(\d+)/);
+                        if (m) id = m[1];
+                    });
+                    if (!id) {
+                        // Если нет ID в ссылке, генерируем из даты+суммы
+                        const dateCell = cells[0] ? cells[0].innerText.trim() : '';
+                        id = dateCell + '_' + sm.toFixed(2);
+                    }
+                    newTransactions.push({ id, sm, type: desc });
+                }
+            });
+
+            // Сравниваем с сохранёнными
+            chrome.storage.local.get(['sm_all_stats'], function(result) {
+                const cached = result.sm_all_stats || [];
+                const reallyNew = newTransactions.filter(t => !cached.find(x => x.id === t.id));
+                if (reallyNew.length > 0) {
+                    // Сохраняем обновлённый список
+                    const combined = [...cached, ...reallyNew];
+                    chrome.storage.local.set({ 'sm_all_stats': combined });
+                    // Получаем текущий курс для рублёвого эквивалента
+                    chrome.storage.local.get(['sm_rate'], function(r) {
+                        const rate = r.sm_rate || 170;
+                        handleNewTransactions(reallyNew, rate);
+                    });
+                }
+            });
+        })
+        .catch(() => {});
 }
 
 // Обработчик изменения курса
@@ -48,7 +161,6 @@ function handleRateUpdate(newRate) {
     const isUp = newRate > previousRate;
 
     getSettings(function(settings) {
-        // Проверяем, нужно ли уведомлять
         if (isUp && !settings.notify_rate_up) { previousRate = newRate; return; }
         if (!isUp && !settings.notify_rate_down) { previousRate = newRate; return; }
 
@@ -74,7 +186,6 @@ function handleNewTransactions(transactions, rate) {
     getSettings(function(settings) {
         if (!settings.notify_downloads) return;
 
-        // Группируем по типу операции
         const byType = {};
         transactions.forEach(t => {
             const type = t.type || 'Транзакция';
@@ -82,7 +193,6 @@ function handleNewTransactions(transactions, rate) {
             byType[type] += t.sm;
         });
 
-        // Если одна транзакция — показываем детально
         if (transactions.length === 1) {
             const t = transactions[0];
             const rub = (t.sm * rate).toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2});
@@ -93,7 +203,6 @@ function handleNewTransactions(transactions, rate) {
             return;
         }
 
-        // Если несколько — сводка
         let details = Object.entries(byType)
             .map(([type, sum]) => `${type}: +${sum.toFixed(2)} $m`)
             .join('\n');
