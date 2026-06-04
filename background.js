@@ -179,27 +179,35 @@ function fetchTransactionsFromBackground() {
 
 // Обработчик изменения курса
 function handleRateUpdate(newRate) {
+    console.log('SM handleRateUpdate: newRate=', newRate, 'previousRate=', previousRate);
     if (previousRate === null) {
+        console.log('SM handleRateUpdate: первый запуск, запоминаю курс', newRate, 'без уведомления');
         previousRate = newRate;
         return;
     }
 
     const changePercent = Math.abs((newRate - previousRate) / previousRate * 100);
     const isUp = newRate > previousRate;
+    console.log('SM handleRateUpdate: изменение', changePercent.toFixed(2) + '%', isUp ? 'вверх' : 'вниз');
 
     getSettings(function(settings) {
-        if (isUp && !settings.notify_rate_up) { previousRate = newRate; return; }
-        if (!isUp && !settings.notify_rate_down) { previousRate = newRate; return; }
+        console.log('SM handleRateUpdate: настройки', settings);
+        if (isUp && !settings.notify_rate_up) { console.log('SM handleRateUpdate: уведомления о повышении отключены'); previousRate = newRate; return; }
+        if (!isUp && !settings.notify_rate_down) { console.log('SM handleRateUpdate: уведомления о понижении отключены'); previousRate = newRate; return; }
 
+        console.log('SM handleRateUpdate: порог', settings.rate_threshold, '%, изменение', changePercent.toFixed(2) + '%');
         if (changePercent >= settings.rate_threshold) {
             const arrow = isUp ? '🟢' : '🔴';
             const direction = isUp ? 'вырос' : 'упал';
             const sign = isUp ? '+' : '-';
 
+            console.log('SM handleRateUpdate: ПОКАЗЫВАЮ УВЕДОМЛЕНИЕ');
             showNotification(
                 `Курс $m ${direction}`,
                 `${arrow} ${previousRate} → ${newRate} ₽ (${sign}${changePercent.toFixed(1)}%)`
             );
+        } else {
+            console.log('SM handleRateUpdate: изменение меньше порога, уведомление не нужно');
         }
 
         previousRate = newRate;
