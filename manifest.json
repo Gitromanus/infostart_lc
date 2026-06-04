@@ -2,8 +2,11 @@
   "manifest_version": 3,
   "name": "Инфостарт Курс SM",
   "version": "1.4",
-  "permissions": ["storage"],
+  "permissions": ["storage", "notifications"],
   "host_permissions": ["https://infostart.ru/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
     {
       "matches": ["https://infostart.ru/*"],

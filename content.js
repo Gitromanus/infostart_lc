@@ -55,6 +55,8 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                     chrome.storage.local.set({ 'sm_rate': newRate });
                     currentRate = newRate;
                     console.log('Курс SM обновлен (фон):', currentRate);
+                    // Уведомление в background об изменении курса
+                    chrome.runtime.sendMessage({ type: 'RATE_UPDATED', rate: newRate }).catch(() => {});
                     // Обновляем дашборд через storage — так renderInfo подхватит новый курс
                     chrome.storage.local.get(['sm_all_stats'], function(r) {
                         const stats = r.sm_all_stats || cachedStats;
@@ -274,7 +276,11 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                     if (txt.includes('$m') && !txt.includes('-') && isAllowedOperation(cells)) {
                         const val = parseFloat(txt.split('$')[0].replace(',', '.').replace(/[^\d.]/g, ''));
                         const fullDate = cells[0].innerText.trim();
-                        if (!isNaN(val)) found.push({ id: fullDate + '_' + val, date: fullDate.split(' ')[0], sm: val });
+                        // Извлекаем тип операции из описания (до номера лота)
+                        const desc = cells[3].innerText.trim();
+                        const typeMatch = desc.match(/^([^\d#№]+)/);
+                        const type = typeMatch ? typeMatch[1].trim() : desc;
+                        if (!isNaN(val)) found.push({ id: fullDate + '_' + val, date: fullDate.split(' ')[0], sm: val, type: type });
                     }
                 }
             });
@@ -437,12 +443,21 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
             const current = parseRows(document);
             let combined = [...cachedStats];
             let changed = false;
+            let newItems = [];
             current.forEach(r => {
-                if (!combined.find(x => x.id === r.id)) { combined.push(r); changed = true; }
+                if (!combined.find(x => x.id === r.id)) { combined.push(r); changed = true; newItems.push(r); }
             });
             if (changed) {
                 chrome.storage.local.set({ 'sm_all_stats': combined });
                 cachedStats = combined;
+                // Уведомление о новых транзакциях
+                if (newItems.length > 0) {
+                    chrome.runtime.sendMessage({
+                        type: 'NEW_TRANSACTIONS',
+                        transactions: newItems,
+                        rate: currentRate
+                    }).catch(() => {});
+                }
             }
             renderInfo(cachedStats);
         };
