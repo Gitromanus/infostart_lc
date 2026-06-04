@@ -123,6 +123,11 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
             dash.innerHTML = `
                 <style>
                     #sm-settings-btn:hover { background:#d0d0d0 !important; transform:scale(1.1); }
+                    /* Toggle Switch */
+                    .sm-toggle { appearance:none; -webkit-appearance:none; width:36px; height:20px; background:#ccc; border-radius:10px; position:relative; cursor:pointer; transition:background 0.2s; flex-shrink:0; margin:0; }
+                    .sm-toggle::before { content:''; position:absolute; top:2px; left:2px; width:16px; height:16px; background:#fff; border-radius:50%; transition:transform 0.2s; }
+                    .sm-toggle:checked { background:#4caf50; }
+                    .sm-toggle:checked::before { transform:translateX(16px); }
                 </style>
                 <!-- Шапка с блоками статистики и кнопкой настроек -->
                 <div style="display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 15px;">
@@ -168,37 +173,8 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                 <div id="sm-settings-modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.4); z-index:9999; justify-content:center; align-items:center;">
                     <div style="background:#fff; border-radius:10px; padding:25px; max-width:400px; width:90%; box-shadow:0 4px 20px rgba(0,0,0,0.2); font-size:14px; max-height:90vh; overflow-y:auto;">
                         <div style="font-size:16px; font-weight:bold; margin-bottom:15px; color:#333;">⚙️ Настройки</div>
-                        
-                        <!-- Блок: Уведомления -->
-                        <div style="margin-bottom:15px;">
-                            <div style="font-size:12px; font-weight:bold; color:#666; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px; padding-bottom:4px; border-bottom:1px solid #eee;">🔔 Уведомления</div>
-                            
-                            <label style="display:flex; align-items:center; gap:8px; margin-bottom:8px; cursor:pointer;">
-                                <input type="checkbox" id="sm-notify-rate-up" checked>
-                                <span>🟢 О повышении курса</span>
-                            </label>
-                            
-                            <label style="display:flex; align-items:center; gap:8px; margin-bottom:8px; cursor:pointer;">
-                                <input type="checkbox" id="sm-notify-rate-down" checked>
-                                <span>🔴 О понижении курса</span>
-                            </label>
-                            
-                            <label style="display:flex; align-items:center; gap:8px; margin-bottom:8px; cursor:pointer;">
-                                <input type="checkbox" id="sm-notify-downloads" checked>
-                                <span>💰 О скачиваниях</span>
-                            </label>
-                            
-                            <div style="margin-top:8px;">
-                                <div style="font-size:12px; color:#666; margin-bottom:4px;">Порог изменения курса (%):</div>
-                                <input type="number" id="sm-rate-threshold" value="5" min="1" max="50" style="width:70px; padding:4px; border:1px solid #ccc; border-radius:4px;">
-                            </div>
-                            
-                            <div style="margin-top:10px;">
-                                <button id="sm-test-notify" style="cursor:pointer; padding:5px 10px; background:#ff9800; color:#fff; border:none; border-radius:4px; font-size:12px;">🔔 Проверить уведомления</button>
-                            </div>
-                        </div>
-                        
-                        <!-- Блок: История -->
+
+                        <!-- Блок: История (наверху) -->
                         <div style="margin-bottom:15px;">
                             <div style="font-size:12px; font-weight:bold; color:#666; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px; padding-bottom:4px; border-bottom:1px solid #eee;">📊 История</div>
                             
@@ -210,12 +186,44 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                             </div>
                         </div>
                         
+                        <!-- Блок: Уведомления -->
+                        <div style="margin-bottom:15px;">
+                            <div style="font-size:12px; font-weight:bold; color:#666; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px; padding-bottom:4px; border-bottom:1px solid #eee;">🔔 Уведомления</div>
+                            
+                            <!-- Повышение курса + порог в одной строке -->
+                            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+                                <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                                    <input type="checkbox" class="sm-toggle" id="sm-notify-rate-up" checked>
+                                    <span>🟢 Повышение курса $m</span>
+                                </label>
+                                <div style="display:flex; align-items:center; gap:6px;">
+                                    <span style="font-size:11px; color:#666; white-space:nowrap;">Порог:</span>
+                                    <input type="number" id="sm-rate-threshold" value="5" min="1" max="50" style="width:50px; padding:3px; border:1px solid #ccc; border-radius:4px; font-size:12px;">
+                                    <span style="font-size:11px; color:#666;">%</span>
+                                </div>
+                            </div>
+                            
+                            <label style="display:flex; align-items:center; gap:8px; margin-bottom:8px; cursor:pointer;">
+                                <input type="checkbox" class="sm-toggle" id="sm-notify-rate-down" checked>
+                                <span>🔴 Понижение курса $m</span>
+                            </label>
+                            
+                            <label style="display:flex; align-items:center; gap:8px; margin-bottom:8px; cursor:pointer;">
+                                <input type="checkbox" class="sm-toggle" id="sm-notify-downloads" checked>
+                                <span>💰 Покупки</span>
+                            </label>
+                            
+                            <div style="margin-top:10px;">
+                                <button id="sm-test-notify" style="cursor:pointer; padding:5px 10px; background:#ff9800; color:#fff; border:none; border-radius:4px; font-size:12px;">🔔 Проверить уведомления</button>
+                            </div>
+                        </div>
+                        
                         <!-- Блок: Отображение -->
                         <div style="margin-bottom:15px;">
                             <div style="font-size:12px; font-weight:bold; color:#666; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px; padding-bottom:4px; border-bottom:1px solid #eee;">👁️ Отображение</div>
                             
                             <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
-                                <input type="checkbox" id="sm-show-prediction" checked>
+                                <input type="checkbox" class="sm-toggle" id="sm-show-prediction" checked>
                                 <span>Показывать прогноз дохода</span>
                             </label>
                         </div>
