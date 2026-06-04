@@ -155,10 +155,11 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                     <div style="font-size:11px; color:#999; text-align:center;">Загрузка прогноза...</div>
                 </div>
 
-                <div style="display:flex; align-items:center; gap:10px;">
+                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
                     <input type="number" id="sm-pages-input" value="10" style="width:50px; padding:3px;">
                     <button id="sm-load-btn" style="cursor:pointer; padding:6px 12px; background:#007bff; color:#fff; border:none; border-radius:4px;">Догрузить историю</button>
                     <span id="sm-status" style="font-size:12px; color:#999;"></span>
+                    <button id="sm-test-notify" style="cursor:pointer; padding:6px 12px; background:#ff9800; color:#fff; border:none; border-radius:4px;">🔔 Тест уведомлений</button>
                 </div>
             `;
             target.parentNode.insertBefore(dash, target);
@@ -172,6 +173,7 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                 };
             });
             document.getElementById('sm-load-btn').onclick = collectHistory;
+            document.getElementById('sm-test-notify').onclick = testNotifications;
         };
 
         const drawChart = (data) => {
@@ -490,6 +492,27 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                 btn.disabled = false;
                 status.innerText = '✅ Готово';
             });
+        };
+
+        // Тестовая функция для проверки уведомлений
+        const testNotifications = () => {
+            // Тест изменения курса
+            chrome.runtime.sendMessage({
+                type: 'RATE_UPDATED',
+                rate: currentRate + Math.round(currentRate * 0.1) // +10%
+            }).catch(() => {});
+
+            // Тест новых транзакций
+            setTimeout(() => {
+                chrome.runtime.sendMessage({
+                    type: 'NEW_TRANSACTIONS',
+                    transactions: [
+                        { sm: 5.00, type: 'Скачивание файла' },
+                        { sm: 3.50, type: 'Платное скачивание файла' }
+                    ],
+                    rate: currentRate
+                }).catch(() => {});
+            }, 1000);
         };
 
         createDashboard();
