@@ -121,6 +121,9 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
             dash.style.cssText = "background:#f8f9fa; border:1px solid #ddd; border-radius:8px; padding:15px; margin-bottom:20px; font-family:sans-serif; color:#333;";
             
             dash.innerHTML = `
+                <style>
+                    #sm-settings-btn:hover { background:#d0d0d0 !important; transform:scale(1.1); }
+                </style>
                 <!-- Шапка с блоками статистики и кнопкой настроек -->
                 <div style="display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 15px;">
                     <div style="flex: 1; min-width: 140px; background:#fff; padding:10px; border-radius:6px; border:1px solid #eee;">
@@ -139,7 +142,7 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                         <div id="sm-val-total-rub" style="color:#d32f2f; font-size:14px; font-weight:bold;">0.00 ₽</div>
                     </div>
                     <div style="display:flex; align-items:center; justify-content:center; min-width:50px;">
-                        <div style="cursor:pointer; font-size:22px; opacity:0.5; transition:opacity 0.2s;" id="sm-settings-btn" title="Настройки">⚙️</div>
+                        <div style="cursor:pointer; font-size:24px; background:#e8e8e8; border-radius:6px; padding:6px 8px; transition:background 0.2s, transform 0.2s; line-height:1;" id="sm-settings-btn" title="Настройки">⚙️</div>
                     </div>
                 </div>
                 
