@@ -17,10 +17,12 @@ chrome.storage.local.get(['sm_rate', 'sm_settings'], function(result) {
     previousRate = result.sm_rate || null;
     const settings = { ...DEFAULT_SETTINGS, ...(result.sm_settings || {}) };
     chrome.storage.local.set({ sm_settings: settings });
+    console.log('SM Service Worker запущен, предыдущий курс:', previousRate, 'настройки:', settings);
 });
 
 // Создаём будильники при установке/обновлении расширения
 chrome.runtime.onInstalled.addListener(() => {
+    console.log('SM Расширение установлено/обновлено, создаю будильники');
     // Проверка курса каждые 30 минут
     chrome.alarms.create('sm-check-rate', { periodInMinutes: 30 });
     // Проверка транзакций каждый час
@@ -29,6 +31,7 @@ chrome.runtime.onInstalled.addListener(() => {
 
 // Обработчик будильников
 chrome.alarms.onAlarm.addListener((alarm) => {
+    console.log('SM Сработал будильник:', alarm.name);
     if (alarm.name === 'sm-check-rate') {
         fetchRateFromBackground();
     } else if (alarm.name === 'sm-check-transactions') {
