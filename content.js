@@ -118,7 +118,7 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
 
             const dash = document.createElement('div');
             dash.id = 'sm-dashboard';
-            dash.style.cssText = "background:#f8f9fa; border:1px solid #ddd; border-radius:8px; padding:15px; margin-bottom:20px; font-family:sans-serif; color:#333;";
+            dash.style.cssText = "background:#f8f9fa; border:1px solid #ddd; border-radius:8px; padding:15px; margin-bottom:20px; font-family:sans-serif; color:#333; position:relative;";
             
             dash.innerHTML = `
                 <div style="display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 15px;">
@@ -137,6 +137,7 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                         <div id="sm-val-total" style="font-size:18px; font-weight:bold; color:#28a745;">0.00 $m</div>
                         <div id="sm-val-total-rub" style="color:#d32f2f; font-size:14px; font-weight:bold;">0.00 ₽</div>
                     </div>
+                    <div style="position:absolute; top:10px; right:10px; cursor:pointer; font-size:20px; opacity:0.5;" id="sm-settings-btn" title="Настройки уведомлений">⚙️</div>
                 </div>
                 
                 <div id="sm-chart-box" style="display:none; background:#fff; padding:15px; border:1px solid #eee; border-radius:6px; margin-bottom:15px;">
@@ -161,6 +162,38 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                     <span id="sm-status" style="font-size:12px; color:#999;"></span>
                     <button id="sm-test-notify" style="cursor:pointer; padding:6px 12px; background:#ff9800; color:#fff; border:none; border-radius:4px;">🔔 Тест уведомлений</button>
                 </div>
+
+                <!-- Модальное окно настроек -->
+                <div id="sm-settings-modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.4); z-index:9999; justify-content:center; align-items:center;">
+                    <div style="background:#fff; border-radius:10px; padding:25px; max-width:380px; width:90%; box-shadow:0 4px 20px rgba(0,0,0,0.2); font-size:14px;">
+                        <div style="font-size:16px; font-weight:bold; margin-bottom:15px; color:#333;">⚙️ Настройки уведомлений</div>
+                        
+                        <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px; cursor:pointer;">
+                            <input type="checkbox" id="sm-notify-rate-up" checked>
+                            <span>🟢 Уведомлять о повышении курса</span>
+                        </label>
+                        
+                        <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px; cursor:pointer;">
+                            <input type="checkbox" id="sm-notify-rate-down" checked>
+                            <span>🔴 Уведомлять о понижении курса</span>
+                        </label>
+                        
+                        <label style="display:flex; align-items:center; gap:8px; margin-bottom:15px; cursor:pointer;">
+                            <input type="checkbox" id="sm-notify-downloads" checked>
+                            <span>💰 Уведомлять о скачиваниях</span>
+                        </label>
+                        
+                        <div style="margin-bottom:15px;">
+                            <div style="font-size:12px; color:#666; margin-bottom:4px;">Порог изменения курса (%):</div>
+                            <input type="number" id="sm-rate-threshold" value="5" min="1" max="50" style="width:70px; padding:4px; border:1px solid #ccc; border-radius:4px;">
+                        </div>
+                        
+                        <div style="display:flex; gap:8px; justify-content:flex-end;">
+                            <button id="sm-settings-close" style="cursor:pointer; padding:6px 14px; background:#eee; color:#333; border:none; border-radius:4px;">Отмена</button>
+                            <button id="sm-settings-save" style="cursor:pointer; padding:6px 14px; background:#007bff; color:#fff; border:none; border-radius:4px;">Сохранить</button>
+                        </div>
+                    </div>
+                </div>
             `;
             target.parentNode.insertBefore(dash, target);
 
@@ -174,6 +207,36 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
             });
             document.getElementById('sm-load-btn').onclick = collectHistory;
             document.getElementById('sm-test-notify').onclick = testNotifications;
+
+            // Настройки уведомлений
+            const settingsBtn = document.getElementById('sm-settings-btn');
+            const settingsModal = document.getElementById('sm-settings-modal');
+            const settingsClose = document.getElementById('sm-settings-close');
+            const settingsSave = document.getElementById('sm-settings-save');
+
+            // Загружаем сохранённые настройки
+            chrome.storage.local.get(['sm_settings'], function(result) {
+                const s = result.sm_settings || {};
+                document.getElementById('sm-notify-rate-up').checked = s.notify_rate_up !== false;
+                document.getElementById('sm-notify-rate-down').checked = s.notify_rate_down !== false;
+                document.getElementById('sm-notify-downloads').checked = s.notify_downloads !== false;
+                document.getElementById('sm-rate-threshold').value = s.rate_threshold || 5;
+            });
+
+            settingsBtn.onclick = () => { settingsModal.style.display = 'flex'; };
+            settingsClose.onclick = () => { settingsModal.style.display = 'none'; };
+            settingsModal.onclick = (e) => { if (e.target === settingsModal) settingsModal.style.display = 'none'; };
+            settingsSave.onclick = () => {
+                const settings = {
+                    notify_rate_up: document.getElementById('sm-notify-rate-up').checked,
+                    notify_rate_down: document.getElementById('sm-notify-rate-down').checked,
+                    notify_downloads: document.getElementById('sm-notify-downloads').checked,
+                    rate_threshold: parseInt(document.getElementById('sm-rate-threshold').value) || 5
+                };
+                chrome.storage.local.set({ sm_settings: settings }, function() {
+                    settingsModal.style.display = 'none';
+                });
+            };
         };
 
         const drawChart = (data) => {
