@@ -1,3 +1,4 @@
+// @ts-nocheck
 console.log('SM content.js: скрипт загружен, URL:', window.location.href);
 chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
     let currentRate = result.sm_rate || 170;
@@ -47,6 +48,13 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
         }
     }
     let currentView = 'month';
+    // Палитра цветов для stacked bar chart (до 20 решений)
+    const STACK_COLORS = [
+        '#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231',
+        '#911eb4', '#42d4f4', '#f032e6', '#bfef45', '#fabed4',
+        '#469990', '#dcbeff', '#9a6324', '#fffac8', '#800000',
+        '#aaffc3', '#808000', '#ffd8b1', '#000075', '#a9a9a9'
+    ];
     
     const isTransact = window.location.href.includes('transact');
 
@@ -225,6 +233,19 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                     <div id="sm-canvas" style="width:100%; height:150px; position:relative;"></div>
                 </div>
 
+                <!-- Stacked bar chart (детальный график по решениям) -->
+                <div id="sm-stacked-chart-box" style="display:none; background:#fff; padding:15px; border:1px solid #eee; border-radius:6px; margin-bottom:15px;">
+                    <div style="font-size:12px; font-weight:bold; color:#666; margin-bottom:10px;">📊 ДОХОД ПО РЕШЕНИЯМ (₽)</div>
+                    <div id="sm-stacked-canvas" style="width:100%; height:180px; position:relative;"></div>
+                    <div id="sm-stacked-legend" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; font-size:10px;"></div>
+                </div>
+
+                <!-- Статистика по публикациям -->
+                <div id="sm-solutions-box" style="display:none; background:#fff; padding:15px; border:1px solid #eee; border-radius:6px; margin-bottom:15px;">
+                    <div style="font-size:12px; font-weight:bold; color:#666; margin-bottom:10px;">📋 СТАТИСТИКА ПО ПУБЛИКАЦИЯМ</div>
+                    <div id="sm-solutions-table-wrap" style="max-height:300px; overflow-y:auto;"></div>
+                </div>
+
                 <!-- Прогноз -->
                 <div id="sm-prediction-box" style="background:#fff; padding:15px; border:1px solid #eee; border-radius:6px; margin-bottom:15px;">
                     <div style="font-size:11px; color:#999; text-align:center;">Загрузка прогноза...</div>
@@ -287,6 +308,14 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                                 <input type="checkbox" class="sm-toggle" id="sm-show-prediction" checked>
                                 <span>Показывать прогноз дохода</span>
                             </label>
+                            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-top:6px;">
+                                <input type="checkbox" class="sm-toggle" id="sm-show-stacked-chart">
+                                <span>📊 Детальный stacked bar chart (доход по решениям)</span>
+                            </label>
+                            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-top:6px;">
+                                <input type="checkbox" class="sm-toggle" id="sm-show-solutions-stats" checked>
+                                <span>📋 Таблица статистики по публикациям</span>
+                            </label>
                         </div>
                         
                         <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:5px;">
@@ -323,11 +352,15 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                 document.getElementById('sm-notify-downloads').checked = s.notify_downloads !== false;
                 document.getElementById('sm-rate-threshold').value = s.rate_threshold || 5;
                 document.getElementById('sm-show-prediction').checked = s.show_prediction !== false;
+                document.getElementById('sm-show-stacked-chart').checked = s.show_stacked_chart === true;
+                document.getElementById('sm-show-solutions-stats').checked = s.show_solutions_stats !== false;
                 // Применяем видимость прогноза
                 const predBox = document.getElementById('sm-prediction-box');
                 if (predBox) {
                     predBox.style.display = s.show_prediction !== false ? 'block' : 'none';
                 }
+                // Применяем видимость stacked chart и таблицы решений
+                applyVisibilitySettings(s);
             });
 
             settingsBtn.onclick = () => { settingsModal.style.display = 'flex'; };
@@ -339,14 +372,20 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                     notify_rate_down: document.getElementById('sm-notify-rate-down').checked,
                     notify_downloads: document.getElementById('sm-notify-downloads').checked,
                     rate_threshold: parseFloat(document.getElementById('sm-rate-threshold').value) || 5,
-                    show_prediction: document.getElementById('sm-show-prediction').checked
+                    show_prediction: document.getElementById('sm-show-prediction').checked,
+                    show_stacked_chart: document.getElementById('sm-show-stacked-chart').checked,
+                    show_solutions_stats: document.getElementById('sm-show-solutions-stats').checked
                 };
                 chrome.storage.local.set({ sm_settings: settings }).catch(() => {});
-                // Применяем видимость прогноза
+                // Применяем видимость
                 const predBox = document.getElementById('sm-prediction-box');
                 if (predBox) {
                     predBox.style.display = settings.show_prediction ? 'block' : 'none';
                 }
+                applyVisibilitySettings(settings);
+                // Перерисовываем графики с новыми настройками
+                drawChart(cachedStats);
+                drawSolutionStats(cachedStats);
                 settingsModal.style.display = 'none';
             };
         };
@@ -493,6 +532,8 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                 document.getElementById('sm-val-total-rub').innerText = format(totalSM) + ' ₽';
                 drawChart(data);
                 drawPrediction(data);
+                drawStackedChart(data);
+                drawSolutionStats(data);
             }
         };
 
@@ -612,9 +653,233 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                     </div>
                     <div style="margin-top:6px; font-size:9px; color:#999; text-align:center;">
                         *Прогноз ${predictionMethod}${similarMonths.length > 0 ? ` (учтено ${similarMonths.length} похожих мес.)` : ''}
-                    </div>
-                `;
+        };
+
+        // Применяет видимость блоков согласно настройкам
+        const applyVisibilitySettings = (settings) => {
+            const stackedBox = document.getElementById('sm-stacked-chart-box');
+            const solutionsBox = document.getElementById('sm-solutions-box');
+            if (stackedBox) {
+                stackedBox.style.display = settings.show_stacked_chart ? 'block' : 'none';
+            }
+            if (solutionsBox) {
+                solutionsBox.style.display = settings.show_solutions_stats !== false ? 'block' : 'none';
+            }
+        };
+
+        // Отрисовка stacked bar chart (доход по решениям)
+        const drawStackedChart = (data) => {
+            const container = document.getElementById('sm-stacked-canvas');
+            if (!container || data.length === 0) return;
+            document.getElementById('sm-stacked-chart-box').style.display = 'block';
+
+            // Группируем данные по периодам и по решениям (description)
+            let grouped = {};
+            const now = new Date();
+            const currentMonth = now.getMonth() + 1;
+            const currentYear = now.getFullYear();
+
+            // Собираем все уникальные названия решений
+            const allSolutions = new Set();
+            data.forEach(e => {
+                if (e.description) allSolutions.add(e.description);
             });
+            const solutionList = Array.from(allSolutions).sort();
+            if (solutionList.length === 0) {
+                container.innerHTML = '<div style="font-size:11px; color:#999; text-align:center; padding:20px;">Нет данных о публикациях</div>';
+                return;
+            }
+
+            // Определяем периоды
+            let periodKeys = [];
+            if (currentView === 'month') {
+                const days = new Date(currentYear, currentMonth, 0).getDate();
+                for (let i = 1; i <= days; i++) periodKeys.push(i.toString().padStart(2, '0'));
+            } else if (currentView === 'year') {
+                for (let i = 1; i <= 12; i++) periodKeys.push(i.toString().padStart(2, '0'));
+            } else {
+                // all — группируем по месяцам
+                const monthSet = new Set();
+                data.forEach(e => {
+                    if (e.date) monthSet.add(e.date.substring(3));
+                });
+                periodKeys = Array.from(monthSet).sort((a, b) => {
+                    const [m1, y1] = a.split('.'); const [m2, y2] = b.split('.');
+                    return new Date(y1, m1-1) - new Date(y2, m2-1);
+                });
+            }
+
+            // Инициализируем grouped: период -> { решение -> сумма }
+            periodKeys.forEach(k => { grouped[k] = {}; });
+            solutionList.forEach(s => { periodKeys.forEach(k => { grouped[k][s] = 0; }); });
+
+            // Заполняем данными
+            data.forEach(e => {
+                if (!e.description) return;
+                let periodKey = null;
+                if (currentView === 'month') {
+                    const [d, m, y] = e.date.split('.');
+                    if (parseInt(m) === currentMonth && parseInt(y) === currentYear) {
+                        periodKey = d;
+                    }
+                } else if (currentView === 'year') {
+                    const [d, m, y] = e.date.split('.');
+                    if (parseInt(y) === currentYear) {
+                        periodKey = m;
+                    }
+                } else {
+                    periodKey = e.date.substring(3);
+                }
+                if (periodKey && grouped[periodKey]) {
+                    grouped[periodKey][e.description] = (grouped[periodKey][e.description] || 0) + (e.sm * currentRate);
+                }
+            });
+
+            // Считаем максимум для шкалы
+            const periodTotals = periodKeys.map(k => Object.values(grouped[k]).reduce((a, b) => a + b, 0));
+            const maxVal = Math.max(...periodTotals, 500);
+
+            const w = container.clientWidth || 600;
+            const h = 140;
+            const colW = (w - 50) / periodKeys.length;
+
+            let svgHtml = `<svg width="100%" height="180" style="overflow:visible">`;
+
+            // Сетка
+            [0, 0.5, 1].forEach(tick => {
+                const yPos = h - (tick * h) + 20;
+                svgHtml += `<line x1="45" y1="${yPos}" x2="${w}" y2="${yPos}" stroke="#f3f3f3" stroke-width="1" />`;
+                svgHtml += `<text x="40" y="${yPos + 3}" font-size="8" fill="#bbb" text-anchor="end">${Math.round(maxVal * tick)}</text>`;
+            });
+
+            // Столбцы stacked
+            periodKeys.forEach((k, i) => {
+                const x = 45 + (i * colW);
+                const barW = Math.max(colW * 0.8, 1);
+                let yOffset = 0;
+                const periodData = grouped[k];
+                // Сортируем решения по убыванию дохода в этом периоде для красоты
+                const sortedSolutions = solutionList.slice().sort((a, b) => (periodData[b] || 0) - (periodData[a] || 0));
+
+                sortedSolutions.forEach((sol, si) => {
+                    const val = periodData[sol] || 0;
+                    if (val <= 0) return;
+                    const colH = (val / maxVal) * h;
+                    const y = h - colH - yOffset + 20;
+                    const color = STACK_COLORS[si % STACK_COLORS.length];
+                    svgHtml += `<rect x="${x + colW*0.1}" y="${y}" width="${barW}" height="${colH}" fill="${color}" rx="0.5" opacity="0.9">
+                                    <title>${sol}: ${val.toLocaleString()} ₽</title>
+                                </rect>`;
+                    yOffset += colH;
+                });
+
+                // Подпись периода
+                if (periodKeys.length < 15 || i % 4 === 0 || i === periodKeys.length-1) {
+                    svgHtml += `<text x="${x + colW/2}" y="${h + 35}" font-size="8" fill="#999" text-anchor="middle">${k}</text>`;
+                }
+            });
+
+            svgHtml += `</svg>`;
+            container.innerHTML = svgHtml;
+
+            // Легенда
+            const legendEl = document.getElementById('sm-stacked-legend');
+            if (legendEl) {
+                legendEl.innerHTML = solutionList.map((sol, i) => {
+                    const total = data.filter(e => e.description === sol).reduce((a, b) => a + b.sm, 0);
+                    const color = STACK_COLORS[i % STACK_COLORS.length];
+                    return `<span style="display:inline-flex;align-items:center;gap:4px;background:#f8f9fa;padding:2px 8px;border-radius:3px;border:1px solid #eee;">
+                                <span style="width:10px;height:10px;border-radius:2px;background:${color};display:inline-block;"></span>
+                                <span title="${sol}">${sol.length > 30 ? sol.substring(0, 28) + '…' : sol}</span>
+                                <span style="color:#666;font-weight:bold;">${total.toFixed(2)} $m</span>
+                            </span>`;
+                }).join('');
+            }
+        };
+
+        // Отрисовка таблицы статистики по публикациям
+        const drawSolutionStats = (data) => {
+            const wrap = document.getElementById('sm-solutions-table-wrap');
+            if (!wrap) return;
+            const solutionsBox = document.getElementById('sm-solutions-box');
+            if (!solutionsBox) return;
+
+            // Группируем по description
+            const stats = {};
+            data.forEach(e => {
+                const key = e.description || '(без названия)';
+                if (!stats[key]) stats[key] = { sm: 0, count: 0, types: new Set(), firstDate: e.date, lastDate: e.date };
+                stats[key].sm += e.sm;
+                stats[key].count++;
+                stats[key].types.add(e.type);
+                if (e.date < stats[key].firstDate) stats[key].firstDate = e.date;
+                if (e.date > stats[key].lastDate) stats[key].lastDate = e.date;
+            });
+
+            const entries = Object.entries(stats)
+                .filter(([name]) => name !== '(без названия)')
+                .sort((a, b) => b[1].sm - a[1].sm);
+
+            if (entries.length === 0) {
+                wrap.innerHTML = '<div style="font-size:11px; color:#999; text-align:center; padding:10px;">Нет данных о публикациях</div>';
+                return;
+            }
+
+            const totalSm = data.reduce((a, b) => a + b.sm, 0);
+
+            let html = `<table style="width:100%; border-collapse:collapse; font-size:11px;">
+                <thead>
+                    <tr style="background:#f0f0f0; position:sticky; top:0;">
+                        <th style="padding:6px 8px; text-align:left; border-bottom:2px solid #ddd;">#</th>
+                        <th style="padding:6px 8px; text-align:left; border-bottom:2px solid #ddd;">Публикация</th>
+                        <th style="padding:6px 8px; text-align:right; border-bottom:2px solid #ddd;">$m</th>
+                        <th style="padding:6px 8px; text-align:right; border-bottom:2px solid #ddd;">₽</th>
+                        <th style="padding:6px 8px; text-align:right; border-bottom:2px solid #ddd;">%</th>
+                        <th style="padding:6px 8px; text-align:right; border-bottom:2px solid #ddd;">Кол-во</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+            entries.forEach(([name, st], idx) => {
+                const rub = (st.sm * currentRate).toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                const pct = totalSm > 0 ? ((st.sm / totalSm) * 100).toFixed(1) : '0.0';
+                const barW = totalSm > 0 ? (st.sm / totalSm) * 100 : 0;
+                const bg = idx % 2 === 0 ? '#fff' : '#fafafa';
+                html += `<tr style="background:${bg};">
+                    <td style="padding:5px 8px; color:#999; text-align:center;">${idx + 1}</td>
+                    <td style="padding:5px 8px; max-width:250px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${name}">
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <span style="flex-shrink:0; width:8px; height:8px; border-radius:2px; background:${STACK_COLORS[idx % STACK_COLORS.length]}; display:inline-block;"></span>
+                            <span>${name}</span>
+                        </div>
+                    </td>
+                    <td style="padding:5px 8px; text-align:right; font-weight:bold; color:#28a745;">${st.sm.toFixed(2)}</td>
+                    <td style="padding:5px 8px; text-align:right; color:#1976d2; font-weight:bold;">${rub}</td>
+                    <td style="padding:5px 8px; text-align:right;">
+                        <div style="display:flex; align-items:center; gap:4px; justify-content:flex-end;">
+                            <div style="width:40px; height:6px; background:#eee; border-radius:3px; overflow:hidden;">
+                                <div style="height:100%; width:${barW}%; background:${STACK_COLORS[idx % STACK_COLORS.length]}; border-radius:3px;"></div>
+                            </div>
+                            <span style="color:#666;">${pct}%</span>
+                        </div>
+                    </td>
+                    <td style="padding:5px 8px; text-align:right; color:#666;">${st.count}</td>
+                </tr>`;
+            });
+
+            // Итоговая строка
+            const totalRub = (totalSm * currentRate).toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            html += `<tr style="background:#f5f5f5; font-weight:bold;">
+                <td style="padding:6px 8px; text-align:center; border-top:2px solid #ddd;"></td>
+                <td style="padding:6px 8px; border-top:2px solid #ddd;">ИТОГО</td>
+                <td style="padding:6px 8px; text-align:right; border-top:2px solid #ddd; color:#28a745;">${totalSm.toFixed(2)} $m</td>
+                <td style="padding:6px 8px; text-align:right; border-top:2px solid #ddd; color:#1976d2;">${totalRub} ₽</td>
+                <td style="padding:6px 8px; text-align:right; border-top:2px solid #ddd; color:#666;">100%</td>
+                <td style="padding:6px 8px; text-align:right; border-top:2px solid #ddd; color:#666;">${data.length}</td>
+            </tr>`;
+
+            html += `</tbody></table>`;
+            wrap.innerHTML = html;
         };
 
         const autoSync = () => {
