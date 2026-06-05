@@ -2,16 +2,18 @@ console.log('SM content.js: скрипт загружен, URL:', window.locatio
 chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
     let currentRate = result.sm_rate || 170;
     let cachedStats = result.sm_all_stats || [];
-    // Нормализация type в кэше: обрезаем до первого номера/лота/цифры/решетки,
-    // чтобы ключ date|time|sm|type совпадал с parseRows
+    // Нормализация кэша: разделяем type на type + description, добавляем time для старых записей
     if (cachedStats.length > 0) {
         let normalized = false;
         cachedStats.forEach(item => {
+            // Нормализуем type: если есть перенос строки, разделяем на type и description
             if (item.type) {
-                const typeMatch = item.type.match(/^([^\d#№]+)/);
-                const normalizedType = typeMatch ? typeMatch[1].trim() : item.type;
-                if (normalizedType !== item.type) {
-                    item.type = normalizedType;
+                const newlineIdx = item.type.indexOf('\n');
+                if (newlineIdx >= 0) {
+                    const newType = item.type.substring(0, newlineIdx).trim();
+                    const newDesc = item.type.substring(newlineIdx + 1).replace(/^Пояснение:\s*/i, '').trim();
+                    item.type = newType;
+                    item.description = newDesc;
                     normalized = true;
                 }
             }
@@ -19,9 +21,13 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
             if (!item.time) {
                 item.time = '';
             }
+            // Добавляем поле description, если его нет
+            if (!item.description) {
+                item.description = '';
+            }
         });
         if (normalized) {
-            console.log('SM content.js: нормализованы type в кэше');
+            console.log('SM content.js: нормализован кэш (type -> type+description)');
             // Сохраняем нормализованные данные обратно в storage
             chrome.storage.local.set({ 'sm_all_stats': cachedStats }).catch(() => {});
         }
@@ -450,11 +456,16 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                         const dateParts = fullDate.split(' ');
                         const date = dateParts[0];
                         const time = dateParts[1] || '';
-                        // Извлекаем тип операции из описания (до номера лота)
+                        // Разделяем описание на тип операции и название публикации
                         const desc = cells[3].innerText.trim();
-                        const typeMatch = desc.match(/^([^\d#№]+)/);
-                        const type = typeMatch ? typeMatch[1].trim() : desc;
-                        if (!isNaN(val)) found.push({ id: date + '_' + val.toFixed(2), date: date, time: time, sm: val, type: type });
+                        const newlineIdx = desc.indexOf('\n');
+                        let type = desc;
+                        let description = '';
+                        if (newlineIdx >= 0) {
+                            type = desc.substring(0, newlineIdx).trim();
+                            description = desc.substring(newlineIdx + 1).replace(/^Пояснение:\s*/i, '').trim();
+                        }
+                        if (!isNaN(val)) found.push({ id: date + '_' + val.toFixed(2), date: date, time: time, sm: val, type: type, description: description });
                     }
                 }
             });
@@ -654,8 +665,7 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
             btn.disabled = true;
             let results = [...cachedStats];
 
-            // Начинаем со страницы 2, т.к. страница 1 уже загружена и обработана autoSync
-            for (let i = 2; i <= pages + 1; i++) {
+            for (let i = 1; i <= pages; i++) {
                 status.innerText = `Стр. ${i}...`;
                 try {
                     const url = new URL(window.location.href);

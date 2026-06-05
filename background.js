@@ -19,25 +19,30 @@ chrome.storage.local.get(['sm_rate', 'sm_settings', 'sm_all_stats'], function(re
     chrome.storage.local.set({ sm_settings: settings });
     console.log('SM Service Worker запущен, предыдущий курс:', previousRate, 'настройки:', settings);
     
-    // Нормализация кэша при старте: обрезаем type и добавляем time для старых записей
+    // Нормализация кэша при старте: разделяем type на type+description, добавляем time
     const cached = result.sm_all_stats || [];
     if (cached.length > 0) {
         let normalized = false;
         cached.forEach(item => {
             if (item.type) {
-                const typeMatch = item.type.match(/^([^\d#№]+)/);
-                const normalizedType = typeMatch ? typeMatch[1].trim() : item.type;
-                if (normalizedType !== item.type) {
-                    item.type = normalizedType;
+                const newlineIdx = item.type.indexOf('\n');
+                if (newlineIdx >= 0) {
+                    const newType = item.type.substring(0, newlineIdx).trim();
+                    const newDesc = item.type.substring(newlineIdx + 1).replace(/^Пояснение:\s*/i, '').trim();
+                    item.type = newType;
+                    item.description = newDesc;
                     normalized = true;
                 }
             }
             if (!item.time) {
                 item.time = '';
             }
+            if (!item.description) {
+                item.description = '';
+            }
         });
         if (normalized) {
-            console.log('SM Service Worker: нормализованы type в кэше при старте');
+            console.log('SM Service Worker: нормализован кэш при старте (type -> type+description)');
             chrome.storage.local.set({ 'sm_all_stats': cached });
         }
     }
@@ -173,16 +178,20 @@ function parseTransactionRow(rowHtml) {
         id = dateStr.split(' ')[0] + '_' + sm.toFixed(2);
     }
 
-    // Унифицируем тип операции: обрезаем до первого номера/лота/цифры/решетки,
-    // чтобы ключ date|sm|type совпадал с content.js (parseRows)
-    const typeMatch = desc.match(/^([^\d#№]+)/);
-    const normalizedType = typeMatch ? typeMatch[1].trim() : desc;
+    // Разделяем описание на тип операции и название публикации
+    const newlineIdx = desc.indexOf('\n');
+    let type = desc;
+    let description = '';
+    if (newlineIdx >= 0) {
+        type = desc.substring(0, newlineIdx).trim();
+        description = desc.substring(newlineIdx + 1).replace(/^Пояснение:\s*/i, '').trim();
+    }
 
     const dateParts = dateStr.split(' ');
     const date = dateParts[0];
     const time = dateParts[1] || '';
 
-    return { id, sm, type: normalizedType, date: date, time: time };
+    return { id, sm, type: type, description: description, date: date, time: time };
 }
 
 // Фоновый запрос транзакций (без DOMParser)
@@ -213,16 +222,17 @@ function fetchTransactionsFromBackground() {
             // Сравниваем с сохранёнными
             chrome.storage.local.get(['sm_all_stats'], function(result) {
                 let cached = result.sm_all_stats || [];
-                // Нормализация type в кэше: обрезаем до первого номера/лота/цифры/решетки,
-                // чтобы ключ date|time|sm|type совпадал с parseTransactionRow
+                // Нормализация кэша: разделяем type на type+description, добавляем time
                 if (cached.length > 0) {
                     let normalized = false;
                     cached.forEach(item => {
                         if (item.type) {
-                            const typeMatch = item.type.match(/^([^\d#№]+)/);
-                            const normalizedType = typeMatch ? typeMatch[1].trim() : item.type;
-                            if (normalizedType !== item.type) {
-                                item.type = normalizedType;
+                            const newlineIdx = item.type.indexOf('\n');
+                            if (newlineIdx >= 0) {
+                                const newType = item.type.substring(0, newlineIdx).trim();
+                                const newDesc = item.type.substring(newlineIdx + 1).replace(/^Пояснение:\s*/i, '').trim();
+                                item.type = newType;
+                                item.description = newDesc;
                                 normalized = true;
                             }
                         }
@@ -230,9 +240,13 @@ function fetchTransactionsFromBackground() {
                         if (!item.time) {
                             item.time = '';
                         }
+                        // Добавляем поле description, если его нет
+                        if (!item.description) {
+                            item.description = '';
+                        }
                     });
                     if (normalized) {
-                        console.log('SM fetchTransactionsFromBackground: нормализованы type в кэше');
+                        console.log('SM fetchTransactionsFromBackground: нормализован кэш (type -> type+description)');
                         // Сохраняем нормализованные данные обратно в storage
                         chrome.storage.local.set({ 'sm_all_stats': cached });
                     }
