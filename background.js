@@ -122,7 +122,9 @@ function parseTransactionRow(rowHtml) {
     const desc = stripHtml(cells[3]);
 
     // Проверяем тип операции
-    const allowedOps = ['Скачивание файла', 'Платное скачивание файла'];
+    const allowedOps = ['Скачивание файла', 'Платное скачивание файла', 'Начисление'];
+    const excludedOps = ['Отмена лота'];
+    if (excludedOps.some(op => desc.startsWith(op))) return null;
     if (!allowedOps.some(op => desc.startsWith(op))) return null;
 
     // Парсим сумму $m из ячеек 1 и 2

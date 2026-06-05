@@ -9,13 +9,22 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
     // Список разрешённых типов операций для учёта
     const ALLOWED_OPERATIONS = [
         'Скачивание файла',
-        'Платное скачивание файла'
+        'Платное скачивание файла',
+        'Начисление'
+    ];
+
+    // Список исключений — операции, которые НЕ нужно учитывать, даже если содержат $m
+    const EXCLUDED_OPERATIONS = [
+        'Отмена лота'
     ];
 
     // Проверяет, относится ли строка таблицы к разрешённому типу операции
     const isAllowedOperation = (cells) => {
         if (cells.length < 4) return false;
         const desc = cells[3].innerText.trim();
+        // Сначала проверяем исключения
+        if (EXCLUDED_OPERATIONS.some(op => desc.startsWith(op))) return false;
+        // Затем проверяем разрешённые операции
         return ALLOWED_OPERATIONS.some(op => desc.startsWith(op));
     };
 
