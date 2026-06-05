@@ -13,11 +13,34 @@ const DEFAULT_SETTINGS = {
 };
 
 // Загружаем настройки и курс при старте
-chrome.storage.local.get(['sm_rate', 'sm_settings'], function(result) {
+chrome.storage.local.get(['sm_rate', 'sm_settings', 'sm_all_stats'], function(result) {
     previousRate = result.sm_rate || null;
     const settings = { ...DEFAULT_SETTINGS, ...(result.sm_settings || {}) };
     chrome.storage.local.set({ sm_settings: settings });
     console.log('SM Service Worker запущен, предыдущий курс:', previousRate, 'настройки:', settings);
+    
+    // Нормализация кэша при старте: обрезаем type и добавляем time для старых записей
+    const cached = result.sm_all_stats || [];
+    if (cached.length > 0) {
+        let normalized = false;
+        cached.forEach(item => {
+            if (item.type) {
+                const typeMatch = item.type.match(/^([^\d#№]+)/);
+                const normalizedType = typeMatch ? typeMatch[1].trim() : item.type;
+                if (normalizedType !== item.type) {
+                    item.type = normalizedType;
+                    normalized = true;
+                }
+            }
+            if (!item.time) {
+                item.time = '';
+            }
+        });
+        if (normalized) {
+            console.log('SM Service Worker: нормализованы type в кэше при старте');
+            chrome.storage.local.set({ 'sm_all_stats': cached });
+        }
+    }
 });
 
 // Создаём будильники при установке/обновлении расширения

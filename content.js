@@ -654,7 +654,8 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
             btn.disabled = true;
             let results = [...cachedStats];
 
-            for (let i = 1; i <= pages; i++) {
+            // Начинаем со страницы 2, т.к. страница 1 уже загружена и обработана autoSync
+            for (let i = 2; i <= pages + 1; i++) {
                 status.innerText = `Стр. ${i}...`;
                 try {
                     const url = new URL(window.location.href);
