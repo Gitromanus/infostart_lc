@@ -150,7 +150,16 @@ function parseTransactionRow(rowHtml) {
         id = dateStr.split(' ')[0] + '_' + sm.toFixed(2);
     }
 
-    return { id, sm, type: desc, date: dateStr.split(' ')[0] };
+    // Унифицируем тип операции: обрезаем до первого номера/лота/цифры/решетки,
+    // чтобы ключ date|sm|type совпадал с content.js (parseRows)
+    const typeMatch = desc.match(/^([^\d#№]+)/);
+    const normalizedType = typeMatch ? typeMatch[1].trim() : desc;
+
+    const dateParts = dateStr.split(' ');
+    const date = dateParts[0];
+    const time = dateParts[1] || '';
+
+    return { id, sm, type: normalizedType, date: date, time: time };
 }
 
 // Фоновый запрос транзакций (без DOMParser)
@@ -180,9 +189,48 @@ function fetchTransactionsFromBackground() {
 
             // Сравниваем с сохранёнными
             chrome.storage.local.get(['sm_all_stats'], function(result) {
-                const cached = result.sm_all_stats || [];
+                let cached = result.sm_all_stats || [];
+                // Нормализация type в кэше: обрезаем до первого номера/лота/цифры/решетки,
+                // чтобы ключ date|time|sm|type совпадал с parseTransactionRow
+                if (cached.length > 0) {
+                    let normalized = false;
+                    cached.forEach(item => {
+                        if (item.type) {
+                            const typeMatch = item.type.match(/^([^\d#№]+)/);
+                            const normalizedType = typeMatch ? typeMatch[1].trim() : item.type;
+                            if (normalizedType !== item.type) {
+                                item.type = normalizedType;
+                                normalized = true;
+                            }
+                        }
+                        // Добавляем поле time, если его нет (для старых записей)
+                        if (!item.time) {
+                            item.time = '';
+                        }
+                    });
+                    if (normalized) {
+                        console.log('SM fetchTransactionsFromBackground: нормализованы type в кэше');
+                        // Сохраняем нормализованные данные обратно в storage
+                        chrome.storage.local.set({ 'sm_all_stats': cached });
+                    }
+                }
+                // Очистка дубликатов: удаляем полностью идентичные записи (дата + время + сумма + тип)
+                if (cached.length > 0) {
+                    const seen = new Map();
+                    cached.forEach(item => {
+                        const key = (item.date || '') + '|' + (item.time || '') + '|' + (item.sm || 0) + '|' + (item.type || '');
+                        seen.set(key, item);
+                    });
+                    if (seen.size < cached.length) {
+                        cached = Array.from(seen.values());
+                        chrome.storage.local.set({ 'sm_all_stats': cached });
+                        console.log('SM fetchTransactionsFromBackground: удалено дубликатов, осталось', cached.length);
+                    }
+                }
+                // Функция ключа для поиска новых транзакций
+                const makeKey = (item) => (item.date || '') + '|' + (item.time || '') + '|' + (item.sm || 0) + '|' + (item.type || '');
                 console.log('SM fetchTransactionsFromBackground: в кэше', cached.length, 'транзакций');
-                const reallyNew = newTransactions.filter(t => !cached.find(x => x.id === t.id));
+                const reallyNew = newTransactions.filter(t => !cached.find(x => makeKey(x) === makeKey(t)));
                 console.log('SM fetchTransactionsFromBackground: действительно новых', reallyNew.length);
                 if (reallyNew.length > 0) {
                     // Сохраняем обновлённый список

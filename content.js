@@ -2,6 +2,44 @@ console.log('SM content.js: скрипт загружен, URL:', window.locatio
 chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
     let currentRate = result.sm_rate || 170;
     let cachedStats = result.sm_all_stats || [];
+    // Нормализация type в кэше: обрезаем до первого номера/лота/цифры/решетки,
+    // чтобы ключ date|time|sm|type совпадал с parseRows
+    if (cachedStats.length > 0) {
+        let normalized = false;
+        cachedStats.forEach(item => {
+            if (item.type) {
+                const typeMatch = item.type.match(/^([^\d#№]+)/);
+                const normalizedType = typeMatch ? typeMatch[1].trim() : item.type;
+                if (normalizedType !== item.type) {
+                    item.type = normalizedType;
+                    normalized = true;
+                }
+            }
+            // Добавляем поле time, если его нет (для старых записей)
+            if (!item.time) {
+                item.time = '';
+            }
+        });
+        if (normalized) {
+            console.log('SM content.js: нормализованы type в кэше');
+            // Сохраняем нормализованные данные обратно в storage
+            chrome.storage.local.set({ 'sm_all_stats': cachedStats }).catch(() => {});
+        }
+    }
+    // Очистка дубликатов: удаляем полностью идентичные записи (одинаковые дата + время + сумма + тип)
+    if (cachedStats.length > 0) {
+        const seen = new Map();
+        cachedStats.forEach(item => {
+            // Ключ уникальности: дата + время + сумма + тип операции
+            const key = (item.date || '') + '|' + (item.time || '') + '|' + (item.sm || 0) + '|' + (item.type || '');
+            seen.set(key, item);
+        });
+        if (seen.size < cachedStats.length) {
+            cachedStats = Array.from(seen.values());
+            console.log('SM content.js: удалено дубликатов, осталось', cachedStats.length);
+            chrome.storage.local.set({ 'sm_all_stats': cachedStats }).catch(() => {});
+        }
+    }
     let currentView = 'month';
     
     const isTransact = window.location.href.includes('transact');
@@ -409,11 +447,14 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                     if (txt.includes('$m') && !txt.includes('-') && isAllowedOperation(cells)) {
                         const val = parseFloat(txt.split('$')[0].replace(',', '.').replace(/[^\d.]/g, ''));
                         const fullDate = cells[0].innerText.trim();
+                        const dateParts = fullDate.split(' ');
+                        const date = dateParts[0];
+                        const time = dateParts[1] || '';
                         // Извлекаем тип операции из описания (до номера лота)
                         const desc = cells[3].innerText.trim();
                         const typeMatch = desc.match(/^([^\d#№]+)/);
                         const type = typeMatch ? typeMatch[1].trim() : desc;
-                        if (!isNaN(val)) found.push({ id: fullDate + '_' + val, date: fullDate.split(' ')[0], sm: val, type: type });
+                        if (!isNaN(val)) found.push({ id: date + '_' + val.toFixed(2), date: date, time: time, sm: val, type: type });
                     }
                 }
             });
@@ -570,8 +611,19 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
             let combined = [...cachedStats];
             let changed = false;
             let newItems = [];
+            // Функция для создания ключа уникальности (дата + время + сумма + тип)
+            const makeKey = (item) => (item.date || '') + '|' + (item.time || '') + '|' + (item.sm || 0) + '|' + (item.type || '');
+            console.log('SM autoSync: на странице', current.length, 'транзакций, в кэше', combined.length);
             current.forEach(r => {
-                if (!combined.find(x => x.id === r.id)) { combined.push(r); changed = true; newItems.push(r); }
+                const key = makeKey(r);
+                const found = combined.find(x => makeKey(x) === key);
+                if (!found) {
+                    console.log('SM autoSync: НОВАЯ транзакция, ключ:', key, 'date:', r.date, 'time:', r.time, 'sm:', r.sm, 'type:', r.type);
+                    // Ищем похожие по дате+сумме, но с другим type — для диагностики
+                    const similar = combined.find(x => (x.date||'')+'|'+(x.sm||0) === (r.date||'')+'|'+(r.sm||0));
+                    if (similar) console.log('SM autoSync: похожая в кэше (другой type):', 'кэш type:', similar.type, 'новый type:', r.type);
+                    combined.push(r); changed = true; newItems.push(r);
+                }
             });
             if (changed) {
                 chrome.storage.local.set({ 'sm_all_stats': combined });
@@ -604,8 +656,10 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                     const buf = await resp.arrayBuffer();
                     const html = decodeResponse(buf);
                     const doc = new DOMParser().parseFromString(html, 'text/html');
+                    const makeKey = (item) => (item.date || '') + '|' + (item.time || '') + '|' + (item.sm || 0) + '|' + (item.type || '');
                     parseRows(doc).forEach(r => {
-                        if (!results.find(x => x.id === r.id)) results.push(r);
+                        const key = makeKey(r);
+                        if (!results.find(x => makeKey(x) === key)) results.push(r);
                     });
                     await new Promise(r => setTimeout(r, 200)); // Защита от 503
                 } catch (e) {}
