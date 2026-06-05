@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Инфостарт Курс SM",
+  "version": "1.5",
+  "permissions": ["storage", "notifications", "alarms"],
+  "host_permissions": ["https://infostart.ru/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://infostart.ru/*"],
+      "js": ["content.js"]
+    }
+  ]
+}

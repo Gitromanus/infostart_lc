@@ -1,0 +1,1037 @@
+console.log('SM content.js: скрипт загружен, URL:', window.location.href);
+chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
+    let currentRate = result.sm_rate || 170;
+    let cachedStats = result.sm_all_stats || [];
+    // Нормализация кэша: разделяем type на type + description, добавляем time для старых записей
+    if (cachedStats.length > 0) {
+        let normalized = false;
+        cachedStats.forEach(item => {
+            // Нормализуем type: если есть перенос строки, разделяем на type и description
+            if (item.type) {
+                const newlineIdx = item.type.indexOf('\n');
+                if (newlineIdx >= 0) {
+                    const newType = item.type.substring(0, newlineIdx).trim();
+                    const newDesc = item.type.substring(newlineIdx + 1).replace(/Пояснение\s*:\s*/gi, '').trim();
+                    item.type = newType;
+                    item.description = newDesc;
+                    normalized = true;
+                }
+            }
+            // Добавляем поле time, если его нет (для старых записей)
+            if (!item.time) {
+                item.time = '';
+            }
+            // Добавляем поле description, если его нет
+            if (!item.description) {
+                item.description = '';
+            }
+        });
+        if (normalized) {
+            console.log('SM content.js: нормализован кэш (type -> type+description)');
+            // Сохраняем нормализованные данные обратно в storage
+            chrome.storage.local.set({ 'sm_all_stats': cachedStats }).catch(() => {});
+        }
+    }
+    // Очистка дубликатов: удаляем полностью идентичные записи (одинаковые дата + время + сумма + тип)
+    if (cachedStats.length > 0) {
+        const seen = new Map();
+        cachedStats.forEach(item => {
+            // Ключ уникальности: дата + время + сумма + тип операции
+            const key = (item.date || '') + '|' + (item.time || '') + '|' + (item.sm || 0) + '|' + (item.type || '');
+            seen.set(key, item);
+        });
+        if (seen.size < cachedStats.length) {
+            cachedStats = Array.from(seen.values());
+            console.log('SM content.js: удалено дубликатов, осталось', cachedStats.length);
+            chrome.storage.local.set({ 'sm_all_stats': cachedStats }).catch(() => {});
+        }
+    }
+    let currentView = 'month';
+    let pubView = 'month'; // период для диаграммы публикаций
+    
+    const isTransact = window.location.href.includes('transact');
+
+    // Список разрешённых типов операций для учёта
+    const ALLOWED_OPERATIONS = [
+        'Скачивание файла',
+        'Платное скачивание файла',
+        'Начисление'
+    ];
+
+    // Список исключений — операции, которые НЕ нужно учитывать, даже если содержат $m
+    const EXCLUDED_OPERATIONS = [
+        'Отмена лота'
+    ];
+
+    // Проверяет, относится ли строка таблицы к разрешённому типу операции
+    const isAllowedOperation = (cells) => {
+        if (cells.length < 4) return false;
+        const desc = cells[3].innerText.trim();
+        // Сначала проверяем исключения
+        if (EXCLUDED_OPERATIONS.some(op => desc.startsWith(op))) return false;
+        // Затем проверяем разрешённые операции
+        return ALLOWED_OPERATIONS.some(op => desc.startsWith(op));
+    };
+
+    // Пробует декодировать ArrayBuffer в строку, определяя кодировку
+    const decodeResponse = (buf) => {
+        // Сначала пробуем windows-1251
+        try {
+            const text = new TextDecoder('windows-1251').decode(buf);
+            // Проверяем, есть ли в тексте узнаваемые русские слова из операций
+            if (text.includes('Скачивание') || text.includes('Платное') || text.includes('$m')) {
+                return text;
+            }
+        } catch (e) {}
+        // Если не нашли — пробуем UTF-8
+        try {
+            return new TextDecoder('utf-8').decode(buf);
+        } catch (e) {}
+        return new TextDecoder('windows-1251').decode(buf);
+    };
+
+    // 1. ОБНОВЛЕНИЕ КУРСА С БИРЖИ
+    // Фоновый fetch курса — срабатывает при каждом открытии любой страницы расширения
+    const fetchRateInBackground = () => {
+        console.log('SM content.js fetchRateInBackground: начинаю запрос к бирже');
+        const stockUrl = 'https://infostart.ru/profile/money/stockexchange/';
+        fetch(stockUrl, { credentials: 'include' })
+            .then(resp => {
+                console.log('SM content.js fetch статус:', resp.status, resp.url);
+                return resp.arrayBuffer();
+            })
+            .then(buf => {
+                console.log('SM content.js fetch: получен ArrayBuffer, размер', buf.byteLength);
+                const html = decodeResponse(buf);
+                console.log('SM content.js fetch: HTML длина', html.length, 'первые 300 символов:', html.substring(0, 300));
+                // Курс в <span class="exh-buy-row">157</span> после текста "Текущий:"
+                // Ищем курс regex прямо в HTML: <span class="exh-buy-row">157</span>
+                const rateMatch = html.match(/<span class=["']exh-sale-row["']>\s*([\d,.]+)\s*<\/span>/);
+                console.log('SM content.js курс найден:', rateMatch ? rateMatch[1] : 'НЕ НАЙДЕНО');
+                const newRate = rateMatch ? parseFloat(rateMatch[1].replace(',', '.')) : NaN;
+                console.log('SM content.js распаршенный курс:', newRate);
+                if (!isNaN(newRate) && newRate > 0 && newRate < 100000) {
+                    chrome.storage.local.set({ 'sm_rate': newRate });
+                    currentRate = newRate;
+                    console.log('SM content.js курс обновлен:', currentRate);
+                    // Уведомление в background об изменении курса
+                    console.log('SM content.js отправляю RATE_UPDATED:', newRate);
+                    chrome.runtime.sendMessage({ type: 'RATE_UPDATED', rate: newRate }).catch(err => console.log('SM content.js ошибка отправки RATE_UPDATED:', err));
+                    // Обновляем дашборд через storage — так renderInfo подхватит новый курс
+                    chrome.storage.local.get(['sm_all_stats'], function(r) {
+                        const stats = r.sm_all_stats || cachedStats;
+                        const valDay = document.getElementById('sm-val-day');
+                        if (valDay) {
+                            const rateLabel = document.querySelector('#sm-dashboard [style*="color:#888"]');
+                            if (rateLabel) rateLabel.innerText = `ЗА СЕГОДНЯ (Курс: ${newRate})`;
+                            const fmt = v => (v * newRate).toLocaleString('ru-RU', {minimumFractionDigits:2, maximumFractionDigits:2});
+                            const todayStr = new Date().toLocaleDateString('ru-RU');
+                            const monthStr = todayStr.substring(3);
+                            const daySM = stats.filter(e => e.date === todayStr).reduce((a,b) => a+b.sm, 0);
+                            const monthSM = stats.filter(e => e.date.endsWith(monthStr)).reduce((a,b) => a+b.sm, 0);
+                            const totalSM = stats.reduce((a,b) => a+b.sm, 0);
+                            document.getElementById('sm-val-day').innerText = daySM.toFixed(2) + ' $m';
+                            document.getElementById('sm-val-day-rub').innerText = fmt(daySM) + ' ₽';
+                            document.getElementById('sm-val-month').innerText = monthSM.toFixed(2) + ' $m';
+                            document.getElementById('sm-val-month-rub').innerText = fmt(monthSM) + ' ₽';
+                            document.getElementById('sm-val-total').innerText = totalSM.toFixed(2) + ' $m';
+                            document.getElementById('sm-val-total-rub').innerText = fmt(totalSM) + ' ₽';
+                            // Перерисовываем суммы в таблице с новым курсом
+                            document.querySelectorAll('.sm-done').forEach(el => el.remove());
+                            document.querySelectorAll('tr').forEach(row => {
+                                const cells = row.querySelectorAll('td');
+                                // Показываем рублёвые суммы только для разрешённых операций
+                                if (!isAllowedOperation(cells)) return;
+                                [1, 2].forEach(idx => {
+                                    const cell = cells[idx];
+                                    if (!cell) return;
+                                    const cellText = cell.innerText.trim();
+                                    if (/^[\d.,]+\$m/.test(cellText)) {
+                                        const val = parseFloat(cellText.split('$')[0].replace(',', '.').replace(/[^\d.]/g, ''));
+                                        if (!isNaN(val)) {
+                                            const d = document.createElement('div');
+                                            d.className = 'sm-done';
+                                            d.style.cssText = 'color:#1976d2; font-weight:bold; font-size:0.85em; margin-top:2px;';
+                                            d.innerText = `(${(val * newRate).toLocaleString('ru-RU', {minimumFractionDigits:2, maximumFractionDigits:2})} ₽)`;
+                                            cell.appendChild(d);
+                                        }
+                                    }
+                                });
+                            });
+                        }
+                    });
+                } else {
+                    console.log('SM content.js курс НЕ валидный:', newRate);
+                }
+            })
+            .catch(e => console.log('SM content.js Ошибка получения курса:', e));
+    };
+
+    if (isTransact) {
+        // Только на странице транзакций — забираем курс с биржи в фоне
+        fetchRateInBackground();
+
+    // 2. ДАШБОРД И ТРАНЗАКЦИИ
+    if (isTransact) {
+        const createDashboard = () => {
+            if (document.getElementById('sm-dashboard')) return;
+            const target = document.querySelector('.pagination') || document.querySelector('.modern-page-navigation') || document.querySelector('table');
+            if (!target) return;
+
+            const dash = document.createElement('div');
+            dash.id = 'sm-dashboard';
+            dash.style.cssText = "background:#f8f9fa; border:1px solid #ddd; border-radius:8px; padding:15px; margin-bottom:20px; font-family:sans-serif; color:#333;";
+            
+            dash.innerHTML = `
+                <style>
+                    #sm-settings-btn:hover { background:#d0d0d0 !important; transform:scale(1.1); }
+                    /* Toggle Switch */
+                    .sm-toggle { appearance:none; -webkit-appearance:none; width:36px; height:20px; background:#ccc; border-radius:10px; position:relative; cursor:pointer; transition:background 0.2s; flex-shrink:0; margin:0; }
+                    .sm-toggle::before { content:''; position:absolute; top:2px; left:2px; width:16px; height:16px; background:#fff; border-radius:50%; transition:transform 0.2s; }
+                    .sm-toggle:checked { background:#4caf50; }
+                    .sm-toggle:checked::before { transform:translateX(16px); }
+                </style>
+                <!-- Шапка с блоками статистики и кнопкой настроек -->
+                <div style="display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 15px;">
+                    <div style="flex: 1; min-width: 140px; background:#fff; padding:10px; border-radius:6px; border:1px solid #eee;">
+                        <div style="font-size:11px; color:#888;">ЗА СЕГОДНЯ (Курс: ${currentRate})</div>
+                        <div id="sm-val-day" style="font-size:18px; font-weight:bold; color:#28a745;">0.00 $m</div>
+                        <div id="sm-val-day-rub" style="color:#1976d2; font-size:14px; font-weight:bold;">0.00 ₽</div>
+                    </div>
+                    <div style="flex: 1; min-width: 140px; background:#fff; padding:10px; border-radius:6px; border:1px solid #eee;">
+                        <div style="font-size:11px; color:#888;">МЕСЯЦ</div>
+                        <div id="sm-val-month" style="font-size:18px; font-weight:bold; color:#28a745;">0.00 $m</div>
+                        <div id="sm-val-month-rub" style="color:#1976d2; font-size:14px; font-weight:bold;">0.00 ₽</div>
+                    </div>
+                    <div style="flex: 1; min-width: 140px; background:#fff; padding:10px; border-radius:6px; border:1px solid #eee;">
+                        <div style="font-size:11px; color:#888;">ОБЩИЙ ИТОГ</div>
+                        <div id="sm-val-total" style="font-size:18px; font-weight:bold; color:#28a745;">0.00 $m</div>
+                        <div id="sm-val-total-rub" style="color:#1976d2; font-size:14px; font-weight:bold;">0.00 ₽</div>
+                    </div>
+                    <div style="display:flex; align-items:stretch; min-width:50px;">
+                        <div style="cursor:pointer; font-size:24px; background:#e8e8e8; border-radius:6px; padding:20px 8px; transition:background 0.2s, transform 0.2s; line-height:1; display:flex; align-items:center;" id="sm-settings-btn" title="Настройки">⚙️</div>
+                    </div>
+                </div>
+                
+                <!-- График -->
+                <div id="sm-chart-box" style="display:none; background:#fff; padding:15px; border:1px solid #eee; border-radius:6px; margin-bottom:15px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                        <div style="font-size:12px; font-weight:bold; color:#666;">ГРАФИК ДОХОДА (₽)</div>
+                        <div id="sm-filters" style="display:flex; gap:5px;">
+                            <button data-v="month" style="cursor:pointer; font-size:10px; padding:3px 8px; border:1px solid #ddd; background:#eee; border-radius:3px;">Месяц</button>
+                            <button data-v="year" style="cursor:pointer; font-size:10px; padding:3px 8px; border:1px solid #ddd; background:#fff; border-radius:3px;">Год</button>
+                            <button data-v="all" style="cursor:pointer; font-size:10px; padding:3px 8px; border:1px solid #ddd; background:#fff; border-radius:3px;">Все</button>
+                        </div>
+                    </div>
+                    <div id="sm-canvas" style="width:100%; height:150px; position:relative;"></div>
+                </div>
+
+                <!-- Ряд: Прогноз + Диаграмма публикаций -->
+                <div style="display:flex; gap:15px; margin-bottom:15px; flex-wrap:wrap;">
+                    <!-- Прогноз слева -->
+                    <div id="sm-prediction-box" style="flex:1; min-width:280px; background:#fff; padding:15px; border:1px solid #eee; border-radius:6px;">
+                        <div style="font-size:11px; color:#999; text-align:center;">Загрузка прогноза...</div>
+                    </div>
+                    <!-- Диаграмма публикаций справа -->
+                    <div id="sm-pub-chart-box" style="flex:1; min-width:280px; background:#fff; border:1px solid #eee; border-radius:6px; padding:15px; display:flex; flex-direction:column; align-items:center;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom:8px;">
+                            <div style="font-size:12px; font-weight:bold; color:#666;">📊 ТОП ПУБЛИКАЦИЙ</div>
+                            <div id="sm-pub-filters" style="display:flex; gap:4px;">
+                                <button data-v="month" style="cursor:pointer; font-size:10px; padding:2px 7px; border:1px solid #ddd; background:#eee; border-radius:3px;">Месяц</button>
+                                <button data-v="year" style="cursor:pointer; font-size:10px; padding:2px 7px; border:1px solid #ddd; background:#fff; border-radius:3px;">Год</button>
+                                <button data-v="all" style="cursor:pointer; font-size:10px; padding:2px 7px; border:1px solid #ddd; background:#fff; border-radius:3px;">Все</button>
+                            </div>
+                        </div>
+                        <div id="sm-pub-canvas" style="width:180px; height:180px; position:relative;"></div>
+                        <div style="width:100%; text-align:right; margin-top:8px;">
+                            <button id="sm-pub-detail-btn" style="cursor:pointer; padding:6px 16px; background:#1976d2; color:#fff; border:none; border-radius:4px; font-size:12px;">📋 Детальная статистика</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Модальное окно детальной статистики по публикациям -->
+                <div id="sm-pub-modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:99999; justify-content:center; align-items:center;">
+                    <div style="background:#fff; border-radius:10px; padding:20px; max-width:800px; width:95%; box-shadow:0 4px 20px rgba(0,0,0,0.3); font-size:14px; max-height:90vh; display:flex; flex-direction:column;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                            <div style="font-size:16px; font-weight:bold; color:#333;">📦 Статистика по публикациям</div>
+                            <span id="sm-pub-modal-close" style="cursor:pointer; font-size:22px; color:#999; line-height:1;">&times;</span>
+                        </div>
+                        <div style="flex:1; overflow-y:auto; border:1px solid #eee; border-radius:4px;">
+                            <table style="width:100%; border-collapse:collapse; font-size:12px;">
+                                <thead>
+                                    <tr style="background:#f8f9fa; position:sticky; top:0; z-index:1;">
+                                        <th style="padding:7px 10px; text-align:left; border-bottom:2px solid #ddd; color:#666; width:35px;">#</th>
+                                        <th style="padding:7px 10px; text-align:left; border-bottom:2px solid #ddd; color:#666;">Публикация</th>
+                                        <th style="padding:7px 10px; text-align:right; border-bottom:2px solid #ddd; color:#666; white-space:nowrap;">Продаж</th>
+                                        <th style="padding:7px 10px; text-align:right; border-bottom:2px solid #ddd; color:#666; white-space:nowrap;">$m</th>
+                                        <th style="padding:7px 10px; text-align:right; border-bottom:2px solid #ddd; color:#666; white-space:nowrap;">₽</th>
+                                        <th style="padding:7px 10px; text-align:right; border-bottom:2px solid #ddd; color:#666; white-space:nowrap;">Последняя</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sm-pub-modal-tbody"></tbody>
+                            </table>
+                        </div>
+                        <div style="margin-top:10px; text-align:right;">
+                            <button id="sm-pub-modal-close-btn" style="cursor:pointer; padding:6px 16px; background:#eee; color:#333; border:none; border-radius:4px; font-size:12px;">Закрыть</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Модальное окно настроек -->
+                <div id="sm-settings-modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.4); z-index:9999; justify-content:center; align-items:center;">
+                    <div style="background:#fff; border-radius:10px; padding:25px; max-width:400px; width:90%; box-shadow:0 4px 20px rgba(0,0,0,0.2); font-size:14px; max-height:90vh; overflow-y:auto;">
+                        <div style="font-size:16px; font-weight:bold; margin-bottom:15px; color:#333;">⚙️ Настройки</div>
+
+                        <!-- Блок: История (наверху) -->
+                        <div style="margin-bottom:15px;">
+                            <div style="font-size:12px; font-weight:bold; color:#666; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px; padding-bottom:4px; border-bottom:1px solid #eee;">📊 История</div>
+                            
+                            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                                <span style="font-size:12px; color:#666;">Страниц:</span>
+                                <input type="number" id="sm-pages-input" value="10" min="1" max="100" style="width:55px; padding:4px; border:1px solid #ccc; border-radius:4px;">
+                                <button id="sm-load-btn" style="cursor:pointer; padding:5px 10px; background:#007bff; color:#fff; border:none; border-radius:4px; font-size:12px;">📥 Догрузить</button>
+                                <span id="sm-status" style="font-size:11px; color:#999;"></span>
+                            </div>
+                        </div>
+                        
+                        <!-- Блок: Уведомления -->
+                        <div style="margin-bottom:15px;">
+                            <div style="font-size:12px; font-weight:bold; color:#666; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px; padding-bottom:4px; border-bottom:1px solid #eee;">🔔 Уведомления</div>
+                            
+                            <!-- Повышение курса + порог в одной строке -->
+                            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+                                <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                                    <input type="checkbox" class="sm-toggle" id="sm-notify-rate-up" checked>
+                                    <span>🟢 Повышение курса $m</span>
+                                </label>
+                                <div style="display:flex; align-items:center; gap:6px;">
+                                    <span style="font-size:11px; color:#666; white-space:nowrap;">Порог:</span>
+                                    <input type="number" id="sm-rate-threshold" value="5" min="0.01" max="50" step="0.01" style="width:60px; padding:3px; border:1px solid #ccc; border-radius:4px; font-size:12px;">
+                                    <span style="font-size:11px; color:#666;">%</span>
+                                </div>
+                            </div>
+                            
+                            <label style="display:flex; align-items:center; gap:8px; margin-bottom:8px; cursor:pointer;">
+                                <input type="checkbox" class="sm-toggle" id="sm-notify-rate-down" checked>
+                                <span>🔴 Понижение курса $m</span>
+                            </label>
+                            
+                            <label style="display:flex; align-items:center; gap:8px; margin-bottom:8px; cursor:pointer;">
+                                <input type="checkbox" class="sm-toggle" id="sm-notify-downloads" checked>
+                                <span>💰 Покупки</span>
+                            </label>
+                            
+                            <div style="margin-top:10px;">
+                                <button id="sm-test-notify" style="cursor:pointer; padding:5px 10px; background:#ff9800; color:#fff; border:none; border-radius:4px; font-size:12px;">🔔 Проверить уведомления</button>
+                            </div>
+                        </div>
+                        
+                        <!-- Блок: Отображение -->
+                        <div style="margin-bottom:15px;">
+                            <div style="font-size:12px; font-weight:bold; color:#666; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px; padding-bottom:4px; border-bottom:1px solid #eee;">👁️ Отображение</div>
+                            
+                            <label style="display:flex; align-items:center; gap:8px; margin-bottom:8px; cursor:pointer;">
+                                <input type="checkbox" class="sm-toggle" id="sm-show-prediction" checked>
+                                <span>Показывать прогноз дохода</span>
+                            </label>
+                            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                                <input type="checkbox" class="sm-toggle" id="sm-show-pub-chart" checked>
+                                <span>📊 Показывать топ публикаций</span>
+                            </label>
+                        </div>
+                        
+                        <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:5px;">
+                            <button id="sm-settings-close" style="cursor:pointer; padding:6px 14px; background:#eee; color:#333; border:none; border-radius:4px;">Закрыть</button>
+                            <button id="sm-settings-save" style="cursor:pointer; padding:6px 14px; background:#007bff; color:#fff; border:none; border-radius:4px;">Сохранить</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            target.parentNode.insertBefore(dash, target);
+
+            document.querySelectorAll('#sm-filters button').forEach(btn => {
+                btn.onclick = () => {
+                    currentView = btn.getAttribute('data-v');
+                    document.querySelectorAll('#sm-filters button').forEach(b => b.style.background = '#fff');
+                    btn.style.background = '#eee';
+                    drawChart(cachedStats);
+                };
+            });
+            document.getElementById('sm-load-btn').onclick = collectHistory;
+            document.getElementById('sm-test-notify').onclick = testNotifications;
+
+            // Настройки уведомлений
+            const settingsBtn = document.getElementById('sm-settings-btn');
+            const settingsModal = document.getElementById('sm-settings-modal');
+            const settingsClose = document.getElementById('sm-settings-close');
+            const settingsSave = document.getElementById('sm-settings-save');
+
+            // Загружаем сохранённые настройки
+            chrome.storage.local.get(['sm_settings'], function(result) {
+                const s = result.sm_settings || {};
+                document.getElementById('sm-notify-rate-up').checked = s.notify_rate_up !== false;
+                document.getElementById('sm-notify-rate-down').checked = s.notify_rate_down !== false;
+                document.getElementById('sm-notify-downloads').checked = s.notify_downloads !== false;
+                document.getElementById('sm-rate-threshold').value = s.rate_threshold || 5;
+                document.getElementById('sm-show-prediction').checked = s.show_prediction !== false;
+                document.getElementById('sm-show-pub-chart').checked = s.show_pub_chart !== false;
+                // Применяем видимость прогноза
+                const predBox = document.getElementById('sm-prediction-box');
+                if (predBox) {
+                    predBox.style.display = s.show_prediction !== false ? 'block' : 'none';
+                }
+                // Применяем видимость топа публикаций
+                const pubChartBox = document.getElementById('sm-pub-chart-box');
+                if (pubChartBox) {
+                    pubChartBox.style.display = s.show_pub_chart !== false ? 'flex' : 'none';
+                }
+            });
+
+            settingsBtn.onclick = () => { settingsModal.style.display = 'flex'; };
+            settingsClose.onclick = () => { settingsModal.style.display = 'none'; };
+            settingsModal.onclick = (e) => { if (e.target === settingsModal) settingsModal.style.display = 'none'; };
+            settingsSave.onclick = () => {
+                const settings = {
+                    notify_rate_up: document.getElementById('sm-notify-rate-up').checked,
+                    notify_rate_down: document.getElementById('sm-notify-rate-down').checked,
+                    notify_downloads: document.getElementById('sm-notify-downloads').checked,
+                    rate_threshold: parseFloat(document.getElementById('sm-rate-threshold').value) || 5,
+                    show_prediction: document.getElementById('sm-show-prediction').checked,
+                    show_pub_chart: document.getElementById('sm-show-pub-chart').checked
+                };
+                chrome.storage.local.set({ sm_settings: settings }).catch(() => {});
+                // Применяем видимость прогноза
+                const predBox = document.getElementById('sm-prediction-box');
+                if (predBox) {
+                    const wasHidden = predBox.style.display === 'none';
+                    predBox.style.display = settings.show_prediction ? 'block' : 'none';
+                    // Если прогноз был скрыт, а теперь включён — перерисовываем
+                    if (wasHidden && settings.show_prediction) {
+                        drawPrediction(cachedStats);
+                    }
+                }
+                // Применяем видимость топа публикаций
+                const pubChartBox = document.getElementById('sm-pub-chart-box');
+                if (pubChartBox) {
+                    const wasHidden = pubChartBox.style.display === 'none';
+                    pubChartBox.style.display = settings.show_pub_chart ? 'flex' : 'none';
+                    // Если топ публикаций был скрыт, а теперь включён — перерисовываем
+                    if (wasHidden && settings.show_pub_chart) {
+                        drawPublicationStats(cachedStats);
+                    }
+                }
+                settingsModal.style.display = 'none';
+            };
+        };
+
+        const drawChart = (data) => {
+            const container = document.getElementById('sm-canvas');
+            if (!container || data.length === 0) return;
+            document.getElementById('sm-chart-box').style.display = 'block';
+
+            let grouped = {};
+            const now = new Date();
+            const currentMonth = now.getMonth() + 1;
+            const currentYear = now.getFullYear();
+
+            if (currentView === 'month') {
+                const days = new Date(currentYear, currentMonth, 0).getDate();
+                for (let i = 1; i <= days; i++) grouped[i.toString().padStart(2, '0')] = 0;
+                data.forEach(e => {
+                    const [d, m, y] = e.date.split('.');
+                    if (parseInt(m) === currentMonth && parseInt(y) === currentYear) {
+                        grouped[d] = (grouped[d] || 0) + (e.sm * currentRate);
+                    }
+                });
+            } else if (currentView === 'year') {
+                for (let i = 1; i <= 12; i++) grouped[i.toString().padStart(2, '0')] = 0;
+                data.forEach(e => {
+                    const [d, m, y] = e.date.split('.');
+                    if (parseInt(y) === currentYear) grouped[m] = (grouped[m] || 0) + (e.sm * currentRate);
+                });
+            } else {
+                data.forEach(e => {
+                    const mKey = e.date.substring(3);
+                    grouped[mKey] = (grouped[mKey] || 0) + (e.sm * currentRate);
+                });
+            }
+
+            const keys = Object.keys(grouped).sort((a,b) => {
+                if (currentView === 'all') {
+                    const [m1, y1] = a.split('.'); const [m2, y2] = b.split('.');
+                    return new Date(y1, m1-1) - new Date(y2, m2-1);
+                }
+                return a.localeCompare(b, undefined, {numeric: true});
+            });
+
+            const maxVal = Math.max(...Object.values(grouped), 500);
+            const w = container.clientWidth;
+            const h = 110;
+            const colW = (w - 50) / keys.length;
+
+            let svgHtml = `<svg width="100%" height="150" style="overflow:visible">`;
+            [0, 0.5, 1].forEach(tick => {
+                const yPos = h - (tick * h) + 20;
+                svgHtml += `<line x1="45" y1="${yPos}" x2="${w}" y2="${yPos}" stroke="#f3f3f3" stroke-width="1" />`;
+                svgHtml += `<text x="40" y="${yPos + 3}" font-size="8" fill="#bbb" text-anchor="end">${Math.round(maxVal * tick)}</text>`;
+            });
+
+            keys.forEach((k, i) => {
+                const val = grouped[k];
+                const colH = (val / maxVal) * h;
+                const x = 45 + (i * colW);
+                const y = h - colH + 20;
+                svgHtml += `<rect x="${x + colW*0.1}" y="${y}" width="${Math.max(colW * 0.8, 1)}" height="${colH}" fill="#28a745" rx="1">
+                                <title>${k}: ${val.toLocaleString()} ₽</title>
+                            </rect>`;
+                if (keys.length < 15 || i % 4 === 0 || i === keys.length-1) {
+                    svgHtml += `<text x="${x + colW/2}" y="${h + 35}" font-size="8" fill="#999" text-anchor="middle">${k}</text>`;
+                }
+            });
+            svgHtml += `</svg>`;
+            container.innerHTML = svgHtml;
+        };
+
+        const updateTable = () => {
+            document.querySelectorAll('tr').forEach(row => {
+                const cells = row.querySelectorAll('td');
+                // Показываем рублёвые суммы только для разрешённых операций
+                if (!isAllowedOperation(cells)) return;
+                // Обрабатываем только 2-ю и 3-ю колонки (приход/расход $m), не баланс
+                [1, 2].forEach(idx => {
+                    const cell = cells[idx];
+                    if (!cell) return;
+                    const cellText = cell.innerText.trim();
+                    // Только если ячейка содержит сумму вида '1.00$m [SM]', не описание
+                    if (/^[\d.,]+\$m/.test(cellText) && !cell.querySelector('.sm-done')) {
+                        const val = parseFloat(cellText.split('$')[0].replace(',', '.').replace(/[^\d.]/g, ''));
+                        if (!isNaN(val)) {
+                            const d = document.createElement('div');
+                            d.className = 'sm-done';
+                            d.style.cssText = 'color:#1976d2; font-weight:bold; font-size:0.85em; margin-top:2px;';
+                            d.innerText = `(${(val * currentRate).toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2})} ₽)`;
+                            cell.appendChild(d);
+                        }
+                    }
+                });
+            });
+        };
+
+        const parseRows = (doc) => {
+            let found = [];
+            doc.querySelectorAll('tr').forEach(row => {
+                const cells = row.querySelectorAll('td');
+                if (cells.length >= 4) {
+                    const txt = cells[1].innerText;
+                    if (txt.includes('$m') && !txt.includes('-') && isAllowedOperation(cells)) {
+                        const val = parseFloat(txt.split('$')[0].replace(',', '.').replace(/[^\d.]/g, ''));
+                        const fullDate = cells[0].innerText.trim();
+                        const dateParts = fullDate.split(' ');
+                        const date = dateParts[0];
+                        const time = dateParts[1] || '';
+                        // Разделяем описание на тип операции и название публикации
+                        const desc = cells[3].innerText.trim();
+                        const newlineIdx = desc.indexOf('\n');
+                        let type = desc;
+                        let description = '';
+                        if (newlineIdx >= 0) {
+                            type = desc.substring(0, newlineIdx).trim();
+                            description = desc.substring(newlineIdx + 1).replace(/Пояснение\s*:\s*/gi, '').trim();
+                        }
+                        if (!isNaN(val)) found.push({ id: date + '_' + val.toFixed(2), date: date, time: time, sm: val, type: type, description: description });
+                    }
+                }
+            });
+            return found;
+        };
+
+        const renderInfo = (data) => {
+            const todayStr = new Date().toLocaleDateString('ru-RU');
+            const monthStr = todayStr.substring(3);
+            const format = (v) => (v * currentRate).toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+            const daySM = data.filter(e => e.date === todayStr).reduce((a, b) => a + b.sm, 0);
+            const monthSM = data.filter(e => e.date.endsWith(monthStr)).reduce((a, b) => a + b.sm, 0);
+            const totalSM = data.reduce((a, b) => a + b.sm, 0);
+
+            if (document.getElementById('sm-val-day')) {
+                // Обновляем лейбл с актуальным курсом
+                const rateLabel = document.querySelector('#sm-dashboard [style*="color:#888"]');
+                if (rateLabel) rateLabel.innerText = `ЗА СЕГОДНЯ (Курс: ${currentRate})`;
+                document.getElementById('sm-val-day').innerText = daySM.toFixed(2) + ' $m';
+                document.getElementById('sm-val-day-rub').innerText = format(daySM) + ' ₽';
+                document.getElementById('sm-val-month').innerText = monthSM.toFixed(2) + ' $m';
+                document.getElementById('sm-val-month-rub').innerText = format(monthSM) + ' ₽';
+                document.getElementById('sm-val-total').innerText = totalSM.toFixed(2) + ' $m';
+                document.getElementById('sm-val-total-rub').innerText = format(totalSM) + ' ₽';
+                drawChart(data);
+                drawPrediction(data);
+                drawPublicationStats(data);
+            }
+        };
+
+        // 3. AI-ПРОГНОЗ ПРИБЫЛИ
+        const drawPrediction = (data) => {
+            const container = document.getElementById('sm-prediction-box');
+            if (!container) return;
+
+            // Проверяем настройку показа прогноза и отрисовываем внутри коллбэка
+            chrome.storage.local.get(['sm_settings'], function(result) {
+                const s = result.sm_settings || {};
+                if (s.show_prediction === false) {
+                    container.style.display = 'none';
+                    return;
+                }
+                container.style.display = 'block';
+
+                if (data.length < 5) {
+                    container.innerHTML = '<div style="font-size:11px; color:#999; text-align:center;">Недостаточно данных для прогноза</div>';
+                    return;
+                }
+
+                const now = new Date();
+                const currentMonth = now.getMonth() + 1;
+                const currentYear = now.getFullYear();
+                const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+                const today = now.getDate();
+                const daysPassed = today;
+                const daysRemaining = daysInMonth - today;
+
+                // Группируем данные по месяцам для анализа истории
+                const monthlyData = {};
+                data.forEach(e => {
+                    const [d, m, y] = e.date.split('.');
+                    const key = `${m}.${y}`;
+                    if (!monthlyData[key]) monthlyData[key] = 0;
+                    monthlyData[key] += e.sm * currentRate;
+                });
+
+                // Считаем доход за текущий месяц
+                let currentMonthTotal = 0;
+                data.forEach(e => {
+                    const [d, m, y] = e.date.split('.');
+                    if (parseInt(m) === currentMonth && parseInt(y) === currentYear) {
+                        currentMonthTotal += e.sm * currentRate;
+                    }
+                });
+
+                // Считаем средний дневной доход в текущем месяце
+                const dailyAvgCurrent = daysPassed > 0 ? currentMonthTotal / daysPassed : 0;
+
+                // Анализируем аналогичные месяцы (те же номера месяцев в прошлые годы)
+                const similarMonths = [];
+                Object.entries(monthlyData).forEach(([key, value]) => {
+                    const [m, y] = key.split('.').map(Number);
+                    if (m === currentMonth && (y !== currentYear || daysPassed >= daysInMonth)) {
+                        const monthDays = new Date(y, m, 0).getDate();
+                        const avgDaily = value / monthDays;
+                        similarMonths.push({ year: y, total: value, avgDaily });
+                    }
+                });
+
+                // Рассчитываем прогноз несколькими методами и берём средневзвешенное значение
+                const method1_currentTrend = currentMonthTotal + (dailyAvgCurrent * daysRemaining);
+                let method2_historicalAvg = null;
+                if (similarMonths.length > 0) {
+                    const avgHistoricalDaily = similarMonths.reduce((sum, m) => sum + m.avgDaily, 0) / similarMonths.length;
+                    method2_historicalAvg = currentMonthTotal + (avgHistoricalDaily * daysRemaining);
+                }
+                const method3_proportional = daysPassed > 0 ? (currentMonthTotal / daysPassed) * daysInMonth : 0;
+
+                let predictedEndOfMonth;
+                let predictionMethod;
+                let confidence = 'средняя';
+                let confidenceColor = '#ff9800';
+
+                if (similarMonths.length >= 2 && method2_historicalAvg !== null) {
+                    const weightCurrent = 0.4;
+                    const weightHistorical = 0.6;
+                    predictedEndOfMonth = (method1_currentTrend * weightCurrent) + (method2_historicalAvg * weightHistorical);
+                    predictionMethod = 'на основе текущего месяца и истории';
+                    confidence = 'высокая';
+                    confidenceColor = '#28a745';
+                } else if (daysPassed >= 5) {
+                    predictedEndOfMonth = method1_currentTrend;
+                    predictionMethod = 'на основе динамики текущего месяца';
+                } else {
+                    predictedEndOfMonth = method3_proportional;
+                    predictionMethod = 'предварительный (мало данных)';
+                    confidence = 'низкая';
+                    confidenceColor = '#f44336';
+                }
+
+                predictedEndOfMonth = Math.max(0, predictedEndOfMonth);
+
+                const trendIcon = predictedEndOfMonth > currentMonthTotal ? '↗' : predictedEndOfMonth < currentMonthTotal ? '↘' : '→';
+                const additionalIncome = Math.max(0, predictedEndOfMonth - currentMonthTotal);
+
+                container.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                        <div style="font-size:12px; font-weight:bold; color:#666;">🤖 ПРОГНОЗ ДО КОНЦА МЕСЯЦА ${trendIcon}</div>
+                        <div style="font-size:9px; color:${confidenceColor};">Достоверность: ${confidence}</div>
+                    </div>
+                    <div style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding:12px; border-radius:6px; text-align:center; margin-bottom:8px;">
+                        <div style="font-size:10px; color:rgba(255,255,255,0.9);">Ожидаемый итог за ${currentMonth}.${currentYear}</div>
+                        <div style="font-size:20px; font-weight:bold; color:#fff; margin-top:4px;">${predictedEndOfMonth.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₽</div>
+                    </div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+                        <div style="background:#f8f9fa; padding:8px; border-radius:4px; text-align:center;">
+                            <div style="font-size:9px; color:#666;">УЖЕ ЗАРАБОТАНО</div>
+                            <div style="font-size:13px; font-weight:bold; color:#28a745;">${currentMonthTotal.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₽</div>
+                        </div>
+                        <div style="background:#f8f9fa; padding:8px; border-radius:4px; text-align:center;">
+                            <div style="font-size:9px; color:#666;">ОЖИДАЕТСЯ (${daysRemaining} дн.)</div>
+                            <div style="font-size:13px; font-weight:bold; color:#1976d2;">+${additionalIncome.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₽</div>
+                        </div>
+                    </div>
+                    <div style="margin-top:6px; font-size:9px; color:#999; text-align:center;">
+                        *Прогноз ${predictionMethod}${similarMonths.length > 0 ? ` (учтено ${similarMonths.length} похожих мес.)` : ''}
+                    </div>
+                `;
+            });
+        };
+
+        // 4. СТАТИСТИКА ПО ПУБЛИКАЦИЯМ
+        // Извлекает ID публикации из description (http://infostart.ru/public/XXXXXX/)
+        const extractPubId = (desc) => {
+            const m = desc.match(/\(https?:\/\/infostart\.ru\/public\/(\d+)\/?\)/);
+            return m ? m[1] : null;
+        };
+
+        // Сокращает название публикации: убирает "Пояснение:", URL и дублирование
+        const shortenPubName = (desc) => {
+            let name = desc;
+            // 0. Убираем "Пояснение:" в любом месте строки (с возможным двоеточием/пробелами)
+            name = name.replace(/Пояснение\s*:\s*/gi, '').trim();
+            // 1. Убираем URL публикации в скобках: (http://infostart.ru/public/XXXXXX/)
+            name = name.replace(/\s*\(https?:\/\/infostart\.ru\/public\/\d+\/?\)\s*/g, ' ').trim();
+            // 2. Убираем дублирование через " - [XXXXX]Название" в конце
+            const m = name.match(/^(.*?)\s*-\s*\[\d+\]/);
+            if (m) return m[1].trim();
+            return name;
+        };
+
+        // Группирует транзакции по названию публикации (description)
+        const groupByPublication = (data, rate) => {
+            const groups = new Map();
+            data.forEach(item => {
+                const rawDesc = (item.description || '').trim();
+                if (!rawDesc) return; // Пропускаем транзакции без названия публикации
+
+                const pubId = extractPubId(rawDesc);
+                const shortName = shortenPubName(rawDesc);
+                // Ключ группировки: ID публикации или сокращённое название
+                const key = pubId || shortName;
+
+                if (!groups.has(key)) {
+                    groups.set(key, {
+                        key: key,
+                        name: shortName,
+                        pubId: pubId,
+                        count: 0,
+                        totalSm: 0,
+                        lastDate: '',
+                        lastTime: '',
+                        types: new Set()
+                    });
+                }
+                const g = groups.get(key);
+                g.count++;
+                g.totalSm += item.sm;
+                if (item.type) g.types.add(item.type);
+                // Обновляем последнюю дату
+                const itemDate = item.date || '';
+                if (itemDate > g.lastDate) {
+                    g.lastDate = itemDate;
+                    g.lastTime = item.time || '';
+                }
+            });
+            // Преобразуем в массив и сортируем по убыванию $m
+            const result = Array.from(groups.values());
+            result.sort((a, b) => b.totalSm - a.totalSm);
+            // Добавляем рублёвый эквивалент
+            result.forEach(g => {
+                g.totalRub = g.totalSm * rate;
+                g.typesArr = Array.from(g.types);
+            });
+            return result;
+        };
+
+        // Цвета для круговой диаграммы
+        const PIE_COLORS = [
+            '#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#F44336',
+            '#00BCD4', '#FF5722', '#3F51B5', '#8BC34A', '#E91E63',
+            '#607D8B', '#CDDC39', '#795548', '#009688', '#FFC107'
+        ];
+
+        // Фильтрует данные по периоду для диаграммы публикаций
+        const filterDataByPeriod = (data, period) => {
+            if (period === 'all') return data;
+            const now = new Date();
+            const currentMonth = now.getMonth() + 1;
+            const currentYear = now.getFullYear();
+            return data.filter(e => {
+                const [d, m, y] = (e.date || '').split('.').map(Number);
+                if (!d || !m || !y) return false;
+                if (period === 'month') return m === currentMonth && y === currentYear;
+                if (period === 'year') return y === currentYear;
+                return true;
+            });
+        };
+
+        // Отрисовывает круговую диаграмму (без легенды)
+        const drawPieChart = (pubData, canvasId, maxItems) => {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas || pubData.length === 0) {
+                if (canvas) canvas.innerHTML = '<div style="text-align:center; padding-top:60px; font-size:11px; color:#999;">Нет данных</div>';
+                return;
+            }
+
+            const topItems = pubData.slice(0, maxItems);
+            const total = topItems.reduce((s, g) => s + g.totalSm, 0);
+            if (total <= 0) {
+                canvas.innerHTML = '<div style="text-align:center; padding-top:60px; font-size:11px; color:#999;">Нет данных</div>';
+                return;
+            }
+
+            const cx = 90, cy = 90, r = 75;
+            let svg = `<svg width="180" height="180" viewBox="0 0 180 180">`;
+            let startAngle = -Math.PI / 2;
+
+            topItems.forEach((g, i) => {
+                const color = PIE_COLORS[i % PIE_COLORS.length];
+                const percent = g.totalSm / total;
+                const angle = percent * 2 * Math.PI;
+                const endAngle = startAngle + angle;
+
+                const x1 = cx + r * Math.cos(startAngle);
+                const y1 = cy + r * Math.sin(startAngle);
+                const x2 = cx + r * Math.cos(endAngle);
+                const y2 = cy + r * Math.sin(endAngle);
+                const largeArc = angle > Math.PI ? 1 : 0;
+
+                svg += `<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${largeArc},1 ${x2},${y2} Z" fill="${color}" stroke="#fff" stroke-width="1.5">
+                            <title>${g.name}: ${g.totalSm.toFixed(2)} $m (${(percent * 100).toFixed(1)}%)</title>
+                        </path>`;
+
+                startAngle = endAngle;
+            });
+
+            svg += `<circle cx="${cx}" cy="${cy}" r="35" fill="#fff" opacity="0.9"/>
+                        <text x="${cx}" y="${cy - 4}" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">${total.toFixed(1)}</text>
+                        <text x="${cx}" y="${cy + 10}" text-anchor="middle" font-size="8" fill="#999">$m</text>
+                    </svg>`;
+
+            canvas.innerHTML = svg;
+        };
+
+        // Отрисовывает модальное окно с полной таблицей публикаций
+        const showPubModal = (pubData) => {
+            const modal = document.getElementById('sm-pub-modal');
+            const tbody = document.getElementById('sm-pub-modal-tbody');
+            if (!modal || !tbody) return;
+
+            tbody.innerHTML = pubData.map((g, i) => {
+                const typeIcon = g.typesArr.includes('Начисление') ? '📝' : '📥';
+                const lastDate = g.lastDate || '—';
+                const lastTime = g.lastTime ? ` ${g.lastTime}` : '';
+                const nameHtml = g.pubId
+                    ? `<a href="https://infostart.ru/public/${g.pubId}/" target="_blank" style="color:#1976d2; text-decoration:none; word-break:break-word;" title="${g.name}">${g.name}</a>`
+                    : `<span style="color:#333; word-break:break-word;">${g.name}</span>`;
+                return `
+                    <tr style="${i % 2 === 0 ? 'background:#fafafa;' : ''}">
+                        <td style="padding:6px 10px; color:#999; text-align:center;">${i + 1}</td>
+                        <td style="padding:6px 10px;">
+                            <div style="display:flex; align-items:center; gap:4px;">
+                                <span title="${g.typesArr.join(', ')}">${typeIcon}</span>
+                                ${nameHtml}
+                            </div>
+                        </td>
+                        <td style="padding:6px 10px; text-align:right; color:#666;">${g.count}</td>
+                        <td style="padding:6px 10px; text-align:right; font-weight:bold; color:#28a745;">${g.totalSm.toFixed(2)}</td>
+                        <td style="padding:6px 10px; text-align:right; font-weight:bold; color:#1976d2;">${g.totalRub.toLocaleString('ru-RU', {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+                        <td style="padding:6px 10px; text-align:right; color:#999; font-size:11px; white-space:nowrap;">${lastDate}${lastTime}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            modal.style.display = 'flex';
+        };
+
+        // Отрисовывает блок статистики по публикациям (диаграмма + кнопка)
+        const drawPublicationStats = (data) => {
+            const canvas = document.getElementById('sm-pub-canvas');
+            const detailBtn = document.getElementById('sm-pub-detail-btn');
+            const filters = document.getElementById('sm-pub-filters');
+            if (!canvas) return;
+
+            // Проверяем настройку показа
+            chrome.storage.local.get(['sm_settings'], function(result) {
+                const s = result.sm_settings || {};
+                const pubChartBox = document.getElementById('sm-pub-chart-box');
+                if (pubChartBox) {
+                    pubChartBox.style.display = s.show_pub_chart !== false ? 'flex' : 'none';
+                }
+                if (s.show_pub_chart === false) return;
+
+            // Фильтруем данные по выбранному периоду
+            const filteredData = filterDataByPeriod(data, pubView);
+            const pubData = groupByPublication(filteredData, currentRate);
+
+            // Рисуем круговую диаграмму (ТОП-10)
+            drawPieChart(pubData, 'sm-pub-canvas', 10);
+
+            // Кнопка "Детальная статистика" — открывает модальное окно
+            if (detailBtn) {
+                detailBtn.onclick = () => showPubModal(pubData);
+            }
+
+            // Переключатели периода
+            if (filters) {
+                filters.querySelectorAll('button').forEach(btn => {
+                    btn.onclick = () => {
+                        pubView = btn.getAttribute('data-v');
+                        filters.querySelectorAll('button').forEach(b => b.style.background = '#fff');
+                        btn.style.background = '#eee';
+                        drawPublicationStats(data);
+                    };
+                });
+                // Подсвечиваем активный
+                filters.querySelectorAll('button').forEach(b => {
+                    b.style.background = b.getAttribute('data-v') === pubView ? '#eee' : '#fff';
+                });
+            }
+
+            // Закрытие модального окна
+            const modal = document.getElementById('sm-pub-modal');
+            const closeBtn = document.getElementById('sm-pub-modal-close');
+            const closeBtn2 = document.getElementById('sm-pub-modal-close-btn');
+            if (modal) {
+                const closeModal = () => { modal.style.display = 'none'; };
+                if (closeBtn) closeBtn.onclick = closeModal;
+                if (closeBtn2) closeBtn2.onclick = closeModal;
+                modal.onclick = (e) => { if (e.target === modal) closeModal(); };
+            }
+        });
+        };
+
+        const autoSync = () => {
+            const current = parseRows(document);
+            let combined = [...cachedStats];
+            let changed = false;
+            let newItems = [];
+            // Функция для создания ключа уникальности (дата + время + сумма + тип)
+            const makeKey = (item) => (item.date || '') + '|' + (item.time || '') + '|' + (item.sm || 0) + '|' + (item.type || '');
+            console.log('SM autoSync: на странице', current.length, 'транзакций, в кэше', combined.length);
+            current.forEach(r => {
+                const key = makeKey(r);
+                const found = combined.find(x => makeKey(x) === key);
+                if (!found) {
+                    console.log('SM autoSync: НОВАЯ транзакция, ключ:', key, 'date:', r.date, 'time:', r.time, 'sm:', r.sm, 'type:', r.type);
+                    // Ищем похожие по дате+сумме, но с другим type или time — для диагностики
+                    const similar = combined.find(x => (x.date||'')+'|'+(x.sm||0) === (r.date||'')+'|'+(r.sm||0));
+                    if (similar) {
+                        console.log('SM autoSync: похожая в кэше (другой type/time):',
+                            'кэш time:', similar.time, 'новый time:', r.time,
+                            'кэш type:', similar.type, 'новый type:', r.type,
+                            'кэш ключ:', makeKey(similar), 'новый ключ:', key);
+                    } else {
+                        console.log('SM autoSync: нет даже по дате+сумме');
+                    }
+                    combined.push(r); changed = true; newItems.push(r);
+                }
+            });
+            if (changed) {
+                chrome.storage.local.set({ 'sm_all_stats': combined });
+                cachedStats = combined;
+                // Уведомление о новых транзакциях
+                if (newItems.length > 0) {
+                    chrome.runtime.sendMessage({
+                        type: 'NEW_TRANSACTIONS',
+                        transactions: newItems,
+                        rate: currentRate
+                    }).catch(() => {});
+                }
+            }
+            renderInfo(cachedStats);
+        };
+
+        const collectHistory = async () => {
+            const btn = document.getElementById('sm-load-btn');
+            const status = document.getElementById('sm-status');
+            const pages = parseInt(document.getElementById('sm-pages-input').value) || 1;
+            btn.disabled = true;
+            let results = [...cachedStats];
+
+            for (let i = 1; i <= pages; i++) {
+                status.innerText = `Стр. ${i}...`;
+                try {
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('PAGEN_1', i);
+                    const resp = await fetch(url.toString());
+                    const buf = await resp.arrayBuffer();
+                    const html = decodeResponse(buf);
+                    const doc = new DOMParser().parseFromString(html, 'text/html');
+                    const makeKey = (item) => (item.date || '') + '|' + (item.time || '') + '|' + (item.sm || 0) + '|' + (item.type || '');
+                    const pageRows = parseRows(doc);
+                    console.log('SM collectHistory: стр.' + i + ', найдено строк:', pageRows.length, 'в кэше:', results.length);
+                    pageRows.forEach(r => {
+                        const key = makeKey(r);
+                        const existing = results.find(x => makeKey(x) === key);
+                        if (!existing) {
+                            // Ищем почему не найдено — может быть разница в time или type
+                            const byDateSm = results.find(x => (x.date||'')+'|'+(x.sm||0) === (r.date||'')+'|'+(r.sm||0));
+                            if (byDateSm) {
+                                console.log('SM collectHistory: НЕ НАЙДЕНО по полному ключу, но есть по дате+сумме:',
+                                    'кэш time:', byDateSm.time, 'новый time:', r.time,
+                                    'кэш type:', byDateSm.type, 'новый type:', r.type,
+                                    'кэш ключ:', makeKey(byDateSm), 'новый ключ:', key);
+                            } else {
+                                console.log('SM collectHistory: СОВСЕМ НОВАЯ транзакция, ключ:', key, 'date:', r.date, 'time:', r.time, 'sm:', r.sm, 'type:', r.type);
+                            }
+                            results.push(r);
+                        }
+                    });
+                    await new Promise(r => setTimeout(r, 200)); // Защита от 503
+                } catch (e) {}
+            }
+            chrome.storage.local.set({ 'sm_all_stats': results }, () => {
+                cachedStats = results;
+                renderInfo(results);
+                btn.disabled = false;
+                status.innerText = '✅ Готово';
+            });
+        };
+
+        // Тестовая функция для проверки уведомлений
+        const testNotifications = () => {
+            // Тест изменения курса
+            chrome.runtime.sendMessage({
+                type: 'RATE_UPDATED',
+                rate: currentRate + Math.round(currentRate * 0.1) // +10%
+            }).catch(() => {});
+
+            // Тест новых транзакций
+            setTimeout(() => {
+                chrome.runtime.sendMessage({
+                    type: 'NEW_TRANSACTIONS',
+                    transactions: [
+                        { sm: 5.00, type: 'Скачивание файла' },
+                        { sm: 3.50, type: 'Платное скачивание файла' }
+                    ],
+                    rate: currentRate
+                }).catch(() => {});
+            }, 1000);
+        };
+
+        createDashboard();
+        updateTable();
+        autoSync();
+
+        setInterval(() => {
+            createDashboard();
+            updateTable();
+        }, 3000);
+    }
+}
+});
