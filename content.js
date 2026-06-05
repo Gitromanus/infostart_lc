@@ -619,9 +619,16 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                 const found = combined.find(x => makeKey(x) === key);
                 if (!found) {
                     console.log('SM autoSync: НОВАЯ транзакция, ключ:', key, 'date:', r.date, 'time:', r.time, 'sm:', r.sm, 'type:', r.type);
-                    // Ищем похожие по дате+сумме, но с другим type — для диагностики
+                    // Ищем похожие по дате+сумме, но с другим type или time — для диагностики
                     const similar = combined.find(x => (x.date||'')+'|'+(x.sm||0) === (r.date||'')+'|'+(r.sm||0));
-                    if (similar) console.log('SM autoSync: похожая в кэше (другой type):', 'кэш type:', similar.type, 'новый type:', r.type);
+                    if (similar) {
+                        console.log('SM autoSync: похожая в кэше (другой type/time):',
+                            'кэш time:', similar.time, 'новый time:', r.time,
+                            'кэш type:', similar.type, 'новый type:', r.type,
+                            'кэш ключ:', makeKey(similar), 'новый ключ:', key);
+                    } else {
+                        console.log('SM autoSync: нет даже по дате+сумме');
+                    }
                     combined.push(r); changed = true; newItems.push(r);
                 }
             });
@@ -657,9 +664,24 @@ chrome.storage.local.get(['sm_rate', 'sm_all_stats'], function(result) {
                     const html = decodeResponse(buf);
                     const doc = new DOMParser().parseFromString(html, 'text/html');
                     const makeKey = (item) => (item.date || '') + '|' + (item.time || '') + '|' + (item.sm || 0) + '|' + (item.type || '');
-                    parseRows(doc).forEach(r => {
+                    const pageRows = parseRows(doc);
+                    console.log('SM collectHistory: стр.' + i + ', найдено строк:', pageRows.length, 'в кэше:', results.length);
+                    pageRows.forEach(r => {
                         const key = makeKey(r);
-                        if (!results.find(x => makeKey(x) === key)) results.push(r);
+                        const existing = results.find(x => makeKey(x) === key);
+                        if (!existing) {
+                            // Ищем почему не найдено — может быть разница в time или type
+                            const byDateSm = results.find(x => (x.date||'')+'|'+(x.sm||0) === (r.date||'')+'|'+(r.sm||0));
+                            if (byDateSm) {
+                                console.log('SM collectHistory: НЕ НАЙДЕНО по полному ключу, но есть по дате+сумме:',
+                                    'кэш time:', byDateSm.time, 'новый time:', r.time,
+                                    'кэш type:', byDateSm.type, 'новый type:', r.type,
+                                    'кэш ключ:', makeKey(byDateSm), 'новый ключ:', key);
+                            } else {
+                                console.log('SM collectHistory: СОВСЕМ НОВАЯ транзакция, ключ:', key, 'date:', r.date, 'time:', r.time, 'sm:', r.sm, 'type:', r.type);
+                            }
+                            results.push(r);
+                        }
                     });
                     await new Promise(r => setTimeout(r, 200)); // Защита от 503
                 } catch (e) {}
